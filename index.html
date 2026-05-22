@@ -13,7 +13,7 @@
           <div class="brand-mark">VW</div>
           <div>
             <h1>Virtual Warehouse</h1>
-            <p>Odd/even bay stock control</p>
+            <p>Live stock &amp; empty-location control</p>
           </div>
         </div>
 
@@ -54,20 +54,20 @@
           </dl>
         </section>
 
-        <section class="quick-panel" aria-label="Stock health">
-          <h2>Stock Health</h2>
+        <section class="quick-panel" aria-label="Box occupancy">
+          <h2>Box Occupancy</h2>
           <div class="health-stack">
-            <div class="health-row good">
-              <span>Healthy</span>
-              <strong id="metricHealthy">0</strong>
-            </div>
-            <div class="health-row watch">
-              <span>Watch</span>
-              <strong id="metricWatch">0</strong>
+            <div class="health-row empty">
+              <span>Empty</span>
+              <strong id="metricEmpty">0</strong>
             </div>
             <div class="health-row low">
-              <span>Low</span>
+              <span>Low (1-5 units)</span>
               <strong id="metricLow">0</strong>
+            </div>
+            <div class="health-row good">
+              <span>Stocked</span>
+              <strong id="metricStocked">0</strong>
             </div>
           </div>
         </section>
@@ -98,10 +98,13 @@
                   <button data-warehouse-mode="row" type="button">Rows</button>
                   <button data-warehouse-mode="box" type="button">Boxes</button>
                 </div>
-                <div class="stepper">
-                  <button id="prevBayButton" type="button" title="Previous bay">Prev</button>
-                  <span id="currentBayLabel">B01</span>
-                  <button id="nextBayButton" type="button" title="Next bay">Next</button>
+                <div class="toolbar-tail">
+                  <button class="utility-button empty-toggle" id="emptyHighlightButton" type="button">Highlight empties</button>
+                  <div class="stepper">
+                    <button id="prevBayButton" type="button" title="Previous bay">Prev</button>
+                    <span id="currentBayLabel">B01</span>
+                    <button id="nextBayButton" type="button" title="Next bay">Next</button>
+                  </div>
                 </div>
               </div>
               <div class="aisle-strip" id="aisleSelector" aria-label="Aisle selector"></div>
@@ -109,9 +112,9 @@
               <div class="three-stage">
                 <div id="warehouse3d" class="warehouse-3d" aria-label="Interactive warehouse visual"></div>
                 <div class="three-hud">
-                  <span>Overview: 15 aisles</span>
+                  <span>10 aisles, A01 to A10</span>
                   <span>Odd bays left, even bays right</span>
-                  <span>Boxes run S1 to S6 left-to-right</span>
+                  <span>Empty boxes are outlined in blue</span>
                 </div>
               </div>
             </section>
@@ -137,9 +140,9 @@
                 <h3>A/B/L/S Map</h3>
               </div>
               <div class="legend">
-                <span><i class="legend-dot healthy"></i>Healthy</span>
-                <span><i class="legend-dot watch"></i>Watch</span>
+                <span><i class="legend-dot empty"></i>Empty</span>
                 <span><i class="legend-dot low"></i>Low</span>
+                <span><i class="legend-dot healthy"></i>Stocked</span>
               </div>
             </div>
             <div id="warehouseMap" class="warehouse-map"></div>
@@ -188,10 +191,10 @@
                 <div class="filter-row">
                   <select id="aisleFilter" aria-label="Filter by aisle"></select>
                   <select id="statusFilter" aria-label="Filter by stock status">
-                    <option value="all">All statuses</option>
-                    <option value="healthy">Healthy</option>
-                    <option value="watch">Watch</option>
-                    <option value="low">Low</option>
+                    <option value="all">All boxes</option>
+                    <option value="empty">Empty</option>
+                    <option value="low">Low (1-5 units)</option>
+                    <option value="healthy">Stocked</option>
                   </select>
                 </div>
               </div>
@@ -208,13 +211,23 @@
                       <th>SKU</th>
                       <th>Product</th>
                       <th>Units</th>
-                      <th>Stock</th>
+                      <th>Status</th>
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody id="inventoryTable"></tbody>
                 </table>
               </div>
+            </section>
+
+            <section class="dashboard-panel wide-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Replenishment</p>
+                  <h3>Empty &amp; Replen Finder</h3>
+                </div>
+              </div>
+              <div id="emptyBoxList" class="empty-finder"></div>
             </section>
 
             <section class="dashboard-panel">
@@ -225,16 +238,6 @@
                 </div>
               </div>
               <div id="alertList" class="alert-list"></div>
-            </section>
-
-            <section class="dashboard-panel">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Availability</p>
-                  <h3>Empty Boxes</h3>
-                </div>
-              </div>
-              <div id="emptyBoxList" class="alert-list"></div>
             </section>
 
             <section class="dashboard-panel">
@@ -270,11 +273,35 @@
               </div>
               <div id="activityLog" class="activity-log"></div>
             </section>
+
+            <section class="dashboard-panel wide-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Bulk &amp; overflow</p>
+                  <h3>Other Locations</h3>
+                </div>
+              </div>
+              <div class="table-wrap other-wrap">
+                <table class="other-table">
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Zone</th>
+                      <th>SKU</th>
+                      <th>Product</th>
+                      <th>Units</th>
+                    </tr>
+                  </thead>
+                  <tbody id="otherLocList"></tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </section>
       </main>
     </div>
 
+    <script src="./inventory.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

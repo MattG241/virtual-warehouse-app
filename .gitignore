@@ -3,3 +3,6 @@
 
 # Dev verification screenshots
 warehouse-*-check.png
+
+# Claude Code local config
+.claude/

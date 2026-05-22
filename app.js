@@ -1,23 +1,20 @@
-const storageKey = "virtualWarehouse:v4";
-const DEFAULT_AISLE_COUNT = 15;
-const DEFAULT_BAY_COUNT = 25;
-const DEFAULT_LEVEL_COUNT = 5;
-const DEFAULT_SLOT_COUNT = 6;
+const storageKey = "virtualWarehouse:v5";
+const DATA = window.WAREHOUSE_DATA || {
+  generatedAt: "",
+  aisleBays: {},
+  levels: 7,
+  slots: 7,
+  skus: {},
+  grid: {},
+  other: []
+};
+const LEVEL_COUNT = DATA.levels || 7;
+const SLOT_COUNT = DATA.slots || 7;
+const DEFAULT_SLOT_COUNT = SLOT_COUNT;
+// A box at or below this unit count counts as "Low" (needs replenishing soon).
+const LOW_UNITS = 5;
 
-const products = [
-  ["NKDLEG-BLK", "NKD Scrunch Leggings - Black", 90],
-  ["NKDBRA-OFW", "NKD Sports Bra - Off White", 78],
-  ["FREHWS-BLK", "Fleece Hoodie - Black", 54],
-  ["FORTRP-GRY", "Force Training Pant - Grey", 70],
-  ["EMGTBK-SND", "Energy Tank - Sand", 82],
-  ["RIBTNK-WHI", "Ribbed Tank - White", 64],
-  ["LFTLEG-MGO", "Lift Leggings - Mango", 58],
-  ["MFXTSH-BLK", "Motion Tee - Black", 74],
-  ["SIGDUF-BLK", "Signature Duffel - Black", 38],
-  ["STWCAP", "Streetwear Cap", 44],
-  ["LSOCKS-BWG", "Crew Socks - Black/White/Grey", 120],
-  ["HCBSBL-LAV", "Hera Seamless Bra - Lavender", 66]
-];
+const $ = (id) => document.getElementById(id);
 
 let state = loadState();
 let selectedAisleId = state.aisles[0]?.id;
@@ -27,113 +24,119 @@ let selectedSlotCode = firstSlot()?.code || "";
 let activeView = "walkthrough";
 let warehouseMode = "overview";
 let bayIndex = 0;
+let emptyFocus = false;
 
 const els = {
-  pageTitle: document.getElementById("pageTitle"),
-  globalSearch: document.getElementById("globalSearch"),
-  resetDataButton: document.getElementById("resetDataButton"),
-  walkthroughView: document.getElementById("walkthroughView"),
-  layoutView: document.getElementById("layoutView"),
-  dashboardView: document.getElementById("dashboardView"),
+  pageTitle: $("pageTitle"),
+  globalSearch: $("globalSearch"),
+  resetDataButton: $("resetDataButton"),
+  walkthroughView: $("walkthroughView"),
+  layoutView: $("layoutView"),
+  dashboardView: $("dashboardView"),
   navButtons: document.querySelectorAll(".nav-button"),
   warehouseModeButtons: document.querySelectorAll("[data-warehouse-mode]"),
-  aisleSelector: document.getElementById("aisleSelector"),
-  prevBayButton: document.getElementById("prevBayButton"),
-  nextBayButton: document.getElementById("nextBayButton"),
-  currentBayLabel: document.getElementById("currentBayLabel"),
-  warehouse3d: document.getElementById("warehouse3d"),
-  selectedSlotTitle: document.getElementById("selectedSlotTitle"),
-  selectedSlotStatus: document.getElementById("selectedSlotStatus"),
-  slotDetail: document.getElementById("slotDetail"),
-  warehouseMap: document.getElementById("warehouseMap"),
-  layoutCanvas: document.getElementById("layoutCanvas"),
-  structureEditor: document.getElementById("structureEditor"),
-  addAisleButton: document.getElementById("addAisleButton"),
-  addBayButton: document.getElementById("addBayButton"),
-  addLaneButton: document.getElementById("addLaneButton"),
-  addSlotButton: document.getElementById("addSlotButton"),
-  removeSelectedButton: document.getElementById("removeSelectedButton"),
-  metricAisles: document.getElementById("metricAisles"),
-  metricBays: document.getElementById("metricBays"),
-  metricSlots: document.getElementById("metricSlots"),
-  metricUnits: document.getElementById("metricUnits"),
-  metricHealthy: document.getElementById("metricHealthy"),
-  metricWatch: document.getElementById("metricWatch"),
-  metricLow: document.getElementById("metricLow"),
-  aisleFilter: document.getElementById("aisleFilter"),
-  statusFilter: document.getElementById("statusFilter"),
-  inventoryTable: document.getElementById("inventoryTable"),
-  alertList: document.getElementById("alertList"),
-  emptyBoxList: document.getElementById("emptyBoxList"),
-  stockForm: document.getElementById("stockForm"),
-  skuSelect: document.getElementById("skuSelect"),
-  adjustmentInput: document.getElementById("adjustmentInput"),
-  noteInput: document.getElementById("noteInput"),
-  activityLog: document.getElementById("activityLog")
+  emptyHighlightButton: $("emptyHighlightButton"),
+  aisleSelector: $("aisleSelector"),
+  prevBayButton: $("prevBayButton"),
+  nextBayButton: $("nextBayButton"),
+  currentBayLabel: $("currentBayLabel"),
+  warehouse3d: $("warehouse3d"),
+  selectedSlotTitle: $("selectedSlotTitle"),
+  selectedSlotStatus: $("selectedSlotStatus"),
+  slotDetail: $("slotDetail"),
+  warehouseMap: $("warehouseMap"),
+  layoutCanvas: $("layoutCanvas"),
+  structureEditor: $("structureEditor"),
+  addAisleButton: $("addAisleButton"),
+  addBayButton: $("addBayButton"),
+  addLaneButton: $("addLaneButton"),
+  addSlotButton: $("addSlotButton"),
+  removeSelectedButton: $("removeSelectedButton"),
+  metricAisles: $("metricAisles"),
+  metricBays: $("metricBays"),
+  metricSlots: $("metricSlots"),
+  metricUnits: $("metricUnits"),
+  metricEmpty: $("metricEmpty"),
+  metricLow: $("metricLow"),
+  metricStocked: $("metricStocked"),
+  aisleFilter: $("aisleFilter"),
+  statusFilter: $("statusFilter"),
+  inventoryTable: $("inventoryTable"),
+  alertList: $("alertList"),
+  emptyBoxList: $("emptyBoxList"),
+  otherLocList: $("otherLocList"),
+  stockForm: $("stockForm"),
+  skuSelect: $("skuSelect"),
+  adjustmentInput: $("adjustmentInput"),
+  noteInput: $("noteInput"),
+  activityLog: $("activityLog")
 };
 
-function makeInitialState() {
+// --- Build the warehouse from the live inventory data --------------------
+
+function makeSlot(slotNumber, parentCode) {
+  const code = parentCode ? `${parentCode}.S${slotNumber}` : "";
+  const entries = (code && DATA.grid[code]) || [];
+  const skus = entries.map(([item, qty, type]) => {
+    const meta = DATA.skus[item] || ["", "", ""];
+    return {
+      sku: item,
+      name: meta[0] || item,
+      color: meta[1] || "",
+      size: meta[2] || "",
+      qty: Number(qty) || 0,
+      type: type || "Pick"
+    };
+  });
+  return { id: `S${slotNumber}`, type: "Box", column: slotNumber, width: 1, depth: 1, skus };
+}
+
+function makeLane(laneNumber, parentCode) {
+  const laneId = codePart("L", laneNumber, 2);
+  const code = parentCode ? `${parentCode}.${laneId}` : "";
   return {
-    aisles: Array.from({ length: DEFAULT_AISLE_COUNT }, (_, aisleIndex) => ({
-      id: codePart("A", aisleIndex + 1),
+    id: laneId,
+    slots: Array.from({ length: SLOT_COUNT }, (_, index) => makeSlot(index + 1, code))
+  };
+}
+
+function makeBay(bayNumber, parentCode) {
+  const bayId = codePart("B", bayNumber);
+  const code = parentCode ? `${parentCode}.${bayId}` : "";
+  return {
+    id: bayId,
+    side: bayNumber % 2 === 1 ? "left" : "right",
+    lanes: Array.from({ length: LEVEL_COUNT }, (_, index) => makeLane(index + 1, code))
+  };
+}
+
+function buildStateFromData() {
+  const aisleNumbers = Object.keys(DATA.aisleBays || {})
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const aisles = aisleNumbers.map((number, index) => {
+    const aisleId = codePart("A", number);
+    const bayCount = DATA.aisleBays[number] || 0;
+    return {
+      id: aisleId,
       name: "",
-      zone: aisleIndex < 5 ? "Pick" : aisleIndex < 10 ? "Bulk" : "Reserve",
-      x: 4 + (aisleIndex % 5) * 18,
-      y: 8 + Math.floor(aisleIndex / 5) * 28,
-      bays: Array.from({ length: DEFAULT_BAY_COUNT }, (_, bayIndexValue) =>
-        makeBay(bayIndexValue + 1, aisleIndex, bayIndexValue)
-      )
-    })),
+      zone: "Pick racking",
+      x: 4 + (index % 5) * 18,
+      y: 8 + Math.floor(index / 5) * 42,
+      bays: Array.from({ length: bayCount }, (_, bay) => makeBay(bay + 1, aisleId))
+    };
+  });
+
+  return {
+    dataVersion: DATA.generatedAt || "",
+    aisles,
     activity: [
       {
-        text: "Warehouse layout loaded",
-        detail: "15 aisles, 25 bays each, odd bays left, even bays right, 6 boxes wide",
+        text: "Live inventory loaded",
+        detail: `${aisleNumbers.length} aisles, ${formatNumber(Object.keys(DATA.grid).length)} stocked boxes from ${formatNumber(DATA.rowCount || 0)} stock lines`,
         at: new Date().toLocaleString()
       }
-    ]
-  };
-}
-
-function makeBay(number, aisleIndex = 0, bayIndexValue = 0) {
-  return {
-    id: codePart("B", number),
-    side: number % 2 === 1 ? "left" : "right",
-    lanes: Array.from({ length: DEFAULT_LEVEL_COUNT }, (_, laneIndex) => makeLane(laneIndex + 1, aisleIndex, bayIndexValue))
-  };
-}
-
-function makeLane(number, aisleIndex = 0, bayIndexValue = 0) {
-  return {
-    id: codePart("L", number, 2),
-    slots: Array.from({ length: DEFAULT_SLOT_COUNT }, (_, slotIndex) =>
-      makeSlot(slotIndex + 1, aisleIndex, bayIndexValue, number - 1, slotIndex)
-    )
-  };
-}
-
-function makeSlot(number, aisleIndex = 0, bayIndexValue = 0, laneIndex = 0, slotIndex = 0) {
-  const productSeed = aisleIndex * 7 + bayIndexValue * 3 + laneIndex * 2 + slotIndex;
-  const itemOne = products[productSeed % products.length];
-  const itemTwo = products[(productSeed + 5) % products.length];
-  const maxOne = itemOne[2];
-  const maxTwo = itemTwo[2];
-  const cycle = (aisleIndex + 2) * (bayIndexValue + 3) * (laneIndex + 1) * (slotIndex + 2);
-  let qtyOne = Math.max(3, Math.round(maxOne * ([0.18, 0.34, 0.56, 0.82, 0.95][cycle % 5])));
-  let qtyTwo = Math.max(2, Math.round(maxTwo * ([0.14, 0.42, 0.68, 0.78][cycle % 4])));
-  if (cycle % 23 === 0) {
-    qtyOne = 0;
-    qtyTwo = 0;
-  }
-
-  return {
-    id: `S${number}`,
-    type: "Box",
-    column: number,
-    width: 1,
-    depth: 1,
-    skus: [
-      { sku: itemOne[0], name: itemOne[1], qty: qtyOne, max: maxOne },
-      { sku: itemTwo[0], name: itemTwo[1], qty: qtyTwo, max: maxTwo }
     ]
   };
 }
@@ -143,17 +146,25 @@ function loadState() {
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.aisles) return parsed;
+      if (parsed && parsed.aisles && parsed.dataVersion === (DATA.generatedAt || "")) {
+        return parsed;
+      }
     }
   } catch (error) {
-    console.warn("Could not load warehouse state", error);
+    console.warn("Could not load saved warehouse state", error);
   }
-  return makeInitialState();
+  return buildStateFromData();
 }
 
 function saveState() {
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  } catch (error) {
+    console.warn("Could not save warehouse state", error);
+  }
 }
+
+// --- Small helpers -------------------------------------------------------
 
 function codePart(prefix, number, size = 2) {
   return `${prefix}${String(number).padStart(size, "0")}`;
@@ -168,7 +179,7 @@ function locationCode(aisle, bay, lane, slot) {
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat("en-AU").format(value);
+  return new Intl.NumberFormat("en-AU").format(value || 0);
 }
 
 function allSlots() {
@@ -213,44 +224,58 @@ function firstSlot() {
   return allSlots()[0];
 }
 
-function fillPercent(itemOrSlot) {
-  if (Array.isArray(itemOrSlot.skus)) {
-    const qty = itemOrSlot.skus.reduce((sum, item) => sum + item.qty, 0);
-    const max = itemOrSlot.skus.reduce((sum, item) => sum + item.max, 0);
-    return max ? Math.round((qty / max) * 100) : 0;
-  }
-  return itemOrSlot.max ? Math.round((itemOrSlot.qty / itemOrSlot.max) * 100) : 0;
-}
+// --- Occupancy / status --------------------------------------------------
 
-function stockSummaryForSlots(slots) {
-  const qty = slots.reduce((sum, slot) => sum + slot.skus.reduce((slotSum, item) => slotSum + item.qty, 0), 0);
-  const max = slots.reduce((sum, slot) => sum + slot.skus.reduce((slotSum, item) => slotSum + item.max, 0), 0);
-  const percent = max ? Math.round((qty / max) * 100) : 0;
-  return {
-    qty,
-    max,
-    percent,
-    status: statusForPercent(percent),
-    empty: qty === 0
-  };
+function slotUnits(slot) {
+  return (slot.skus || []).reduce((sum, item) => sum + (item.qty || 0), 0);
 }
 
 function totalUnitsForSlot(slot) {
-  return slot.skus.reduce((sum, item) => sum + item.qty, 0);
+  return slotUnits(slot);
 }
 
-function statusForPercent(percent) {
-  if (percent <= 30) return "low";
-  if (percent <= 60) return "watch";
+// CSS class names: "healthy" = stocked (green), "low" = red, "empty" = blue outline.
+function statusForUnits(units) {
+  if (units <= 0) return "empty";
+  if (units <= LOW_UNITS) return "low";
   return "healthy";
 }
 
 function statusFor(itemOrSlot) {
-  return statusForPercent(fillPercent(itemOrSlot));
+  if (Array.isArray(itemOrSlot.skus)) return statusForUnits(slotUnits(itemOrSlot));
+  return statusForUnits(itemOrSlot.qty || 0);
 }
 
 function statusLabel(status) {
-  return status === "low" ? "Low" : status === "watch" ? "Watch" : "Healthy";
+  if (status === "empty") return "Empty";
+  if (status === "low") return "Low";
+  return "Stocked";
+}
+
+function barColor(status) {
+  if (status === "empty") return "#94a3b8";
+  if (status === "low") return "#c24135";
+  return "#2f855a";
+}
+
+function fillPercent(itemOrSlot) {
+  const units = Array.isArray(itemOrSlot.skus)
+    ? slotUnits(itemOrSlot)
+    : itemOrSlot.qty || 0;
+  return Math.max(0, Math.min(100, Math.round((units / 40) * 100)));
+}
+
+function stockSummaryForSlots(slots) {
+  const units = slots.reduce((sum, slot) => sum + slotUnits(slot), 0);
+  const total = slots.length;
+  const emptyCount = slots.filter((slot) => slotUnits(slot) === 0).length;
+  const lowCount = slots.filter((slot) => statusFor(slot) === "low").length;
+  const occupied = total - emptyCount;
+  const percent = total ? Math.round((occupied / total) * 100) : 0;
+  let status = "healthy";
+  if (total && emptyCount === total) status = "empty";
+  else if (total && emptyCount / total >= 0.5) status = "low";
+  return { units, total, emptyCount, lowCount, occupied, percent, status };
 }
 
 function baySideLabel(bayOrSlot) {
@@ -259,7 +284,10 @@ function baySideLabel(bayOrSlot) {
 }
 
 function boxPositionLabel(slotOrNumber) {
-  const number = typeof slotOrNumber === "number" ? slotOrNumber : slotOrNumber?.column || codeNumber(slotOrNumber?.id);
+  const number =
+    typeof slotOrNumber === "number"
+      ? slotOrNumber
+      : slotOrNumber?.column || codeNumber(slotOrNumber?.id);
   return `S${number}`;
 }
 
@@ -267,9 +295,7 @@ function aisleDisplayName(aisle) {
   return aisle.name ? `${aisle.id} - ${aisle.name}` : aisle.id;
 }
 
-function barColor(status) {
-  return status === "low" ? "#c24135" : status === "watch" ? "#c78314" : "#2f855a";
-}
+// --- Selection getters ---------------------------------------------------
 
 function getAisle(id = selectedAisleId) {
   return state.aisles.find((aisle) => aisle.id === id) || state.aisles[0];
@@ -293,7 +319,9 @@ function findRealSlot(code) {
   for (const aisle of state.aisles) {
     for (const bay of aisle.bays) {
       for (const lane of bay.lanes) {
-        const slot = lane.slots.find((candidate) => locationCode(aisle, bay, lane, candidate) === code);
+        const slot = lane.slots.find(
+          (candidate) => locationCode(aisle, bay, lane, candidate) === code
+        );
         if (slot) return { aisle, bay, lane, slot };
       }
     }
@@ -311,6 +339,23 @@ function selectSlot(code) {
   bayIndex = match.aisle.bays.findIndex((bay) => bay.id === match.bay.id);
 }
 
+function jumpToBay(aisleId, bayId, mode = "row") {
+  const aisle = getAisle(aisleId);
+  if (!aisle) return;
+  selectedAisleId = aisle.id;
+  const bay = aisle.bays.find((item) => item.id === bayId) || aisle.bays[0];
+  selectedBayId = bay.id;
+  bayIndex = aisle.bays.findIndex((item) => item.id === bay.id);
+  selectedLaneId = bay.lanes[0]?.id;
+  if (bay.lanes[0]?.slots[0]) {
+    selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+  }
+  setView("walkthrough");
+  warehouseMode = mode;
+  updateWarehouseModeButtons();
+  render();
+}
+
 function slotMatchesSearch(slot, query) {
   if (!query) return true;
   const haystack = [
@@ -323,12 +368,14 @@ function slotMatchesSearch(slot, query) {
     boxPositionLabel(slot),
     slot.slotType,
     slot.zone,
-    ...slot.skus.flatMap((item) => [item.sku, item.name])
+    ...slot.skus.flatMap((item) => [item.sku, item.name, item.color, item.size])
   ]
     .join(" ")
     .toLowerCase();
   return haystack.includes(query.toLowerCase());
 }
+
+// --- Render orchestration ------------------------------------------------
 
 function render() {
   keepSelectionValid();
@@ -340,22 +387,27 @@ function render() {
   renderFilters();
   renderInventoryTable();
   renderAlerts();
-  renderEmptyBoxes();
+  renderEmptyFinder();
+  renderOtherLocations();
   renderSkuSelect();
   renderActivity();
   renderWarehouse3d();
 }
 
 function keepSelectionValid() {
-  if (!state.aisles.length) state = makeInitialState();
+  if (!state.aisles.length) state = buildStateFromData();
   const aisle = getAisle();
   selectedAisleId = aisle.id;
   if (!aisle.bays.length) aisle.bays.push(makeBay(nextNumber([], "B")));
-  if (!selectedBayId || !aisle.bays.some((bay) => bay.id === selectedBayId)) selectedBayId = aisle.bays[0].id;
+  if (!selectedBayId || !aisle.bays.some((bay) => bay.id === selectedBayId)) {
+    selectedBayId = aisle.bays[0].id;
+  }
   bayIndex = Math.max(0, aisle.bays.findIndex((bay) => bay.id === selectedBayId));
   const bay = getBay();
   if (!bay.lanes.length) bay.lanes.push(makeLane(nextNumber([], "L")));
-  if (!selectedLaneId || !bay.lanes.some((lane) => lane.id === selectedLaneId)) selectedLaneId = bay.lanes[0].id;
+  if (!selectedLaneId || !bay.lanes.some((lane) => lane.id === selectedLaneId)) {
+    selectedLaneId = bay.lanes[0].id;
+  }
   const lane = getLane();
   if (!lane.slots.length) lane.slots.push(makeSlot(nextNumber([], "S")));
   if (!selectedSlotCode || !findRealSlot(selectedSlotCode)) {
@@ -365,22 +417,28 @@ function keepSelectionValid() {
 
 function renderMetrics() {
   const slots = allSlots();
-  const rows = allSkuRows();
-  const counts = slots.reduce(
-    (acc, slot) => {
-      acc[statusFor(slot)] += 1;
-      return acc;
-    },
-    { healthy: 0, watch: 0, low: 0 }
-  );
+  let empty = 0;
+  let low = 0;
+  let stocked = 0;
+  let units = 0;
+  slots.forEach((slot) => {
+    const slotTotal = slotUnits(slot);
+    units += slotTotal;
+    const status = statusForUnits(slotTotal);
+    if (status === "empty") empty += 1;
+    else if (status === "low") low += 1;
+    else stocked += 1;
+  });
 
   els.metricAisles.textContent = state.aisles.length;
-  els.metricBays.textContent = state.aisles.reduce((sum, aisle) => sum + aisle.bays.length, 0);
-  els.metricSlots.textContent = slots.length;
-  els.metricUnits.textContent = formatNumber(rows.reduce((sum, item) => sum + item.qty, 0));
-  els.metricHealthy.textContent = counts.healthy;
-  els.metricWatch.textContent = counts.watch;
-  els.metricLow.textContent = counts.low;
+  els.metricBays.textContent = formatNumber(
+    state.aisles.reduce((sum, aisle) => sum + aisle.bays.length, 0)
+  );
+  els.metricSlots.textContent = formatNumber(slots.length);
+  els.metricUnits.textContent = formatNumber(units);
+  els.metricEmpty.textContent = formatNumber(empty);
+  els.metricLow.textContent = formatNumber(low);
+  els.metricStocked.textContent = formatNumber(stocked);
 }
 
 function renderAisleSelector() {
@@ -389,13 +447,16 @@ function renderAisleSelector() {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = aisle.id;
-    button.title = `${aisleDisplayName(aisle)} - ${aisle.zone}`;
+    button.title = `${aisleDisplayName(aisle)} - ${aisle.bays.length} bays`;
     button.className = aisle.id === selectedAisleId ? "active" : "";
     button.addEventListener("click", () => {
       selectedAisleId = aisle.id;
-      selectedBayId = aisle.bays[Math.min(bayIndex, aisle.bays.length - 1)]?.id || aisle.bays[0]?.id;
+      selectedBayId =
+        aisle.bays[Math.min(bayIndex, aisle.bays.length - 1)]?.id || aisle.bays[0]?.id;
       selectedLaneId = getBay()?.lanes[0]?.id;
-      selectedSlotCode = getBay()?.lanes[0]?.slots[0] ? locationCode(aisle, getBay(), getBay().lanes[0], getBay().lanes[0].slots[0]) : "";
+      selectedSlotCode = getBay()?.lanes[0]?.slots[0]
+        ? locationCode(aisle, getBay(), getBay().lanes[0], getBay().lanes[0].slots[0])
+        : "";
       render();
     });
     els.aisleSelector.appendChild(button);
@@ -420,11 +481,13 @@ function renderSlotDetail() {
   }
 
   const status = statusFor(slot);
+  const units = slotUnits(slot);
   els.selectedSlotTitle.textContent = slot.code;
   els.selectedSlotStatus.textContent = statusLabel(status);
   els.selectedSlotStatus.className = `status-pill ${status}`;
   els.slotDetail.className = "box-detail";
-  els.slotDetail.innerHTML = `
+
+  const header = `
     <div class="location-strip">
       <div><span>Aisle</span><strong>${slot.aisleId}</strong></div>
       <div><span>Bay</span><strong>${slot.bayId}</strong></div>
@@ -433,30 +496,42 @@ function renderSlotDetail() {
     <div class="detail-meta">
       <span>${baySideLabel(slot)}</span>
       <span>Box ${boxPositionLabel(slot)} left-to-right</span>
-      <span>${slot.zone}</span>
-      <span>${slot.slotType}</span>
+      <span>${formatNumber(units)} units</span>
     </div>
-    <div class="sku-stack">
+  `;
+
+  if (!slot.skus.length) {
+    els.slotDetail.innerHTML =
+      header +
+      `<div class="empty-box-callout">
+        <strong>Empty box</strong>
+        <p>No stock in this position - available to replenish.</p>
+      </div>`;
+    return;
+  }
+
+  els.slotDetail.innerHTML =
+    header +
+    `<div class="sku-stack">
       ${slot.skus
         .map((item) => {
-          const percent = fillPercent(item);
-          const itemStatus = statusForPercent(percent);
+          const itemStatus = statusForUnits(item.qty);
+          const variant = [item.color, item.size].filter(Boolean).join(" / ");
           return `
             <article class="sku-card">
               <header>
                 <div>
                   <h4>${item.sku}</h4>
-                  <span class="sku-meta">${item.name}</span>
+                  <span class="sku-meta">${item.name}${variant ? ` - ${variant}` : ""}</span>
                 </div>
-                <span class="status-tag ${itemStatus}">${formatNumber(item.qty)} / ${formatNumber(item.max)}</span>
+                <span class="status-tag ${itemStatus}">${formatNumber(item.qty)} units</span>
               </header>
-              <div class="stock-bar" style="--fill: ${percent}%; --bar: ${barColor(itemStatus)}"><i></i></div>
+              <div class="stock-bar" style="--fill: ${fillPercent(item)}%; --bar: ${barColor(itemStatus)}"><i></i></div>
             </article>
           `;
         })
         .join("")}
-    </div>
-  `;
+    </div>`;
 }
 
 function renderMap() {
@@ -466,7 +541,7 @@ function renderMap() {
   state.aisles.forEach((aisle) => {
     const aisleEl = document.createElement("div");
     aisleEl.className = "map-lane";
-    aisleEl.innerHTML = `<div class="map-lane-label">${aisle.id}<small>${aisle.name || aisle.zone}</small></div>`;
+    aisleEl.innerHTML = `<div class="map-lane-label">${aisle.id}<small>${aisle.bays.length} bays</small></div>`;
     const baysEl = document.createElement("div");
     baysEl.className = "map-bay-sides";
 
@@ -477,46 +552,61 @@ function renderMap() {
       const bayGrid = document.createElement("div");
       bayGrid.className = "map-shelves";
 
-      aisle.bays.filter((bay) => (bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right")) === side).forEach((bay) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      const active = aisle.id === selectedAisleId && bay.id === selectedBayId;
-      button.className = `map-shelf${active ? " active" : ""}`;
-      const slots = bay.lanes.flatMap((lane) =>
-        lane.slots.map((slot) => ({
-          ...slot,
-          code: locationCode(aisle, bay, lane, slot),
-          aisleName: aisle.name,
-          aisleId: aisle.id,
-          zone: aisle.zone,
-          bayId: bay.id,
-          baySide: bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right"),
-          laneId: lane.id,
-          slotId: slot.id
-        }))
-      );
-      const units = slots.flatMap((slot) => slot.skus).reduce((sum, item) => sum + item.qty, 0);
-      button.innerHTML = `
-        <strong>${bay.id}</strong>
-        <span class="sku-meta">${baySideLabel(bay)} / ${bay.lanes.length} L / ${DEFAULT_SLOT_COUNT} wide</span>
-        <span class="sku-meta">${formatNumber(units)} units</span>
-        <span class="mini-boxes">
-          ${slots
-            .filter((slot) => slot.laneId === selectedLaneId || slot.laneId === bay.lanes[0]?.id)
-            .slice(0, DEFAULT_SLOT_COUNT)
-            .map((slot) => `<i class="mini-box ${statusFor(slot)}" style="opacity:${slotMatchesSearch(slot, query) ? 1 : 0.18}"></i>`)
-            .join("")}
-        </span>
-      `;
-      button.addEventListener("click", () => {
-        selectedAisleId = aisle.id;
-        selectedBayId = bay.id;
-        selectedLaneId = bay.lanes[0]?.id;
-        if (bay.lanes[0]?.slots[0]) selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
-        render();
-      });
-      bayGrid.appendChild(button);
-    });
+      aisle.bays
+        .filter(
+          (bay) =>
+            (bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right")) === side
+        )
+        .forEach((bay) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          const active = aisle.id === selectedAisleId && bay.id === selectedBayId;
+          const slots = bay.lanes.flatMap((lane) =>
+            lane.slots.map((slot) => ({
+              ...slot,
+              code: locationCode(aisle, bay, lane, slot),
+              aisleName: aisle.name,
+              aisleId: aisle.id,
+              zone: aisle.zone,
+              bayId: bay.id,
+              baySide: bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right"),
+              laneId: lane.id,
+              slotId: slot.id
+            }))
+          );
+          const summary = stockSummaryForSlots(slots);
+          button.className = `map-shelf ${summary.status}${active ? " active" : ""}`;
+          button.innerHTML = `
+            <strong>${bay.id}</strong>
+            <span class="sku-meta">${summary.emptyCount} empty / ${slots.length} boxes</span>
+            <span class="sku-meta">${formatNumber(summary.units)} units</span>
+            <span class="mini-boxes">
+              ${slots
+                .filter(
+                  (slot) =>
+                    slot.laneId === selectedLaneId || slot.laneId === bay.lanes[0]?.id
+                )
+                .slice(0, DEFAULT_SLOT_COUNT)
+                .map(
+                  (slot) =>
+                    `<i class="mini-box ${statusFor(slot)}" style="opacity:${
+                      slotMatchesSearch(slot, query) ? 1 : 0.18
+                    }"></i>`
+                )
+                .join("")}
+            </span>
+          `;
+          button.addEventListener("click", () => {
+            selectedAisleId = aisle.id;
+            selectedBayId = bay.id;
+            selectedLaneId = bay.lanes[0]?.id;
+            if (bay.lanes[0]?.slots[0]) {
+              selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+            }
+            render();
+          });
+          bayGrid.appendChild(button);
+        });
       sideEl.appendChild(bayGrid);
       baysEl.appendChild(sideEl);
     });
@@ -543,17 +633,21 @@ function renderLayoutCanvas() {
     aisleButton.style.left = `${aisle.x}%`;
     aisleButton.style.top = `${aisle.y}%`;
     const aisleSlots = slots.filter((slot) => slot.aisleId === aisle.id);
-    const oddBays = aisle.bays.filter((bay) => (bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right")) === "left").length;
-    const evenBays = aisle.bays.length - oddBays;
+    const emptyCount = aisleSlots.filter((slot) => slotUnits(slot) === 0).length;
     aisleButton.innerHTML = `
       <strong>${aisle.id}</strong>
       <span>${aisle.name || "No aisle name set"}</span>
-      <small>${oddBays} odd left / ${evenBays} even right</small>
-      <small>${aisle.bays.length} bays / 6 wide / ${aisleSlots.length} S</small>
+      <small>${aisle.bays.length} bays / ${LEVEL_COUNT} levels / ${SLOT_COUNT} wide</small>
+      <small>${formatNumber(emptyCount)} empty of ${formatNumber(aisleSlots.length)} boxes</small>
       <span class="layout-slot-strip">
         ${aisleSlots
           .slice(0, 32)
-          .map((slot) => `<i class="${statusFor(slot)}" style="opacity:${slotMatchesSearch(slot, query) ? 1 : 0.2}"></i>`)
+          .map(
+            (slot) =>
+              `<i class="${statusFor(slot)}" style="opacity:${
+                slotMatchesSearch(slot, query) ? 1 : 0.2
+              }"></i>`
+          )
           .join("")}
       </span>
     `;
@@ -563,7 +657,12 @@ function renderLayoutCanvas() {
       selectedBayId = aisle.bays[0]?.id;
       selectedLaneId = aisle.bays[0]?.lanes[0]?.id;
       if (aisle.bays[0]?.lanes[0]?.slots[0]) {
-        selectedSlotCode = locationCode(aisle, aisle.bays[0], aisle.bays[0].lanes[0], aisle.bays[0].lanes[0].slots[0]);
+        selectedSlotCode = locationCode(
+          aisle,
+          aisle.bays[0],
+          aisle.bays[0].lanes[0],
+          aisle.bays[0].lanes[0].slots[0]
+        );
       }
       render();
     });
@@ -611,16 +710,17 @@ function renderStructureEditor() {
     <div class="code-preview">${slot?.code || "No location"}</div>
     <label>
       Optional Aisle Name
-      <input id="editAisleName" type="text" value="${aisle.name}" placeholder="e.g. Returns, Fast Pick, Footwear" />
-    </label>
-    <label>
-      Zone
-      <input id="editAisleZone" type="text" value="${aisle.zone}" />
+      <input id="editAisleName" type="text" value="${aisle.name}" placeholder="e.g. Womens Core, Footwear" />
     </label>
     <label>
       Selected Bay
       <select id="editBaySelect">
-        ${aisle.bays.map((item) => `<option value="${item.id}" ${item.id === bay.id ? "selected" : ""}>${item.id} - ${baySideLabel(item)}</option>`).join("")}
+        ${aisle.bays
+          .map(
+            (item) =>
+              `<option value="${item.id}" ${item.id === bay.id ? "selected" : ""}>${item.id} - ${baySideLabel(item)}</option>`
+          )
+          .join("")}
       </select>
     </label>
     <div class="structure-stat">
@@ -630,7 +730,12 @@ function renderStructureEditor() {
     <label>
       Selected L
       <select id="editLaneSelect">
-        ${bay.lanes.map((item) => `<option value="${item.id}" ${item.id === lane.id ? "selected" : ""}>${item.id}</option>`).join("")}
+        ${bay.lanes
+          .map(
+            (item) =>
+              `<option value="${item.id}" ${item.id === lane.id ? "selected" : ""}>${item.id}</option>`
+          )
+          .join("")}
       </select>
     </label>
     <div class="slot-picker">
@@ -641,37 +746,28 @@ function renderStructureEditor() {
         })
         .join("")}
     </div>
-    <label>
-      S Type
-      <select id="editSlotType">
-        ${["Box", "Pallet", "Bin", "Empty", "Oversize"].map((type) => `<option ${slot?.type === type ? "selected" : ""}>${type}</option>`).join("")}
-      </select>
-    </label>
   `;
 
-  document.getElementById("editAisleName").addEventListener("input", (event) => {
+  $("editAisleName").addEventListener("input", (event) => {
     aisle.name = event.target.value;
     saveState();
     renderAisleSelector();
   });
-  document.getElementById("editAisleZone").addEventListener("input", (event) => {
-    aisle.zone = event.target.value;
-    saveState();
-    renderAisleSelector();
-    renderMap();
-    renderWarehouse3d();
-  });
-  document.getElementById("editBaySelect").addEventListener("change", (event) => {
+  $("editBaySelect").addEventListener("change", (event) => {
     selectedBayId = event.target.value;
     selectedLaneId = getBay().lanes[0]?.id;
     const nextLane = getLane();
-    if (nextLane?.slots[0]) selectedSlotCode = locationCode(getAisle(), getBay(), nextLane, nextLane.slots[0]);
+    if (nextLane?.slots[0]) {
+      selectedSlotCode = locationCode(getAisle(), getBay(), nextLane, nextLane.slots[0]);
+    }
     render();
   });
-  document.getElementById("editLaneSelect").addEventListener("change", (event) => {
+  $("editLaneSelect").addEventListener("change", (event) => {
     selectedLaneId = event.target.value;
     const nextLane = getLane();
-    if (nextLane?.slots[0]) selectedSlotCode = locationCode(getAisle(), getBay(), nextLane, nextLane.slots[0]);
+    if (nextLane?.slots[0]) {
+      selectedSlotCode = locationCode(getAisle(), getBay(), nextLane, nextLane.slots[0]);
+    }
     render();
   });
   document.querySelectorAll(".slot-picker button").forEach((button) => {
@@ -679,14 +775,6 @@ function renderStructureEditor() {
       selectSlot(button.dataset.code);
       render();
     });
-  });
-  document.getElementById("editSlotType").addEventListener("change", (event) => {
-    const match = findRealSlot(selectedSlotCode);
-    if (!match) return;
-    match.slot.type = event.target.value;
-    saveState();
-    renderSlotDetail();
-    renderWarehouse3d();
   });
 }
 
@@ -699,18 +787,69 @@ function renderFilters() {
     option.textContent = aisle.name ? `${aisle.id} - ${aisle.name}` : aisle.id;
     els.aisleFilter.appendChild(option);
   });
-  els.aisleFilter.value = [...state.aisles.map((aisle) => aisle.id), "all"].includes(currentAisle) ? currentAisle : "all";
+  els.aisleFilter.value = [...state.aisles.map((aisle) => aisle.id), "all"].includes(
+    currentAisle
+  )
+    ? currentAisle
+    : "all";
+}
+
+function inventoryRows() {
+  return allSlots().flatMap((slot) => {
+    if (slot.skus.length) {
+      return slot.skus.map((item) => ({
+        empty: false,
+        sku: item.sku,
+        name: item.name,
+        color: item.color,
+        size: item.size,
+        qty: item.qty,
+        code: slot.code,
+        aisleId: slot.aisleId,
+        bayId: slot.bayId,
+        baySide: slot.baySide,
+        laneId: slot.laneId,
+        slotId: slot.slotId
+      }));
+    }
+    return [
+      {
+        empty: true,
+        sku: "",
+        name: "Empty box",
+        color: "",
+        size: "",
+        qty: 0,
+        code: slot.code,
+        aisleId: slot.aisleId,
+        bayId: slot.bayId,
+        baySide: slot.baySide,
+        laneId: slot.laneId,
+        slotId: slot.slotId
+      }
+    ];
+  });
 }
 
 function renderInventoryTable() {
   const query = els.globalSearch.value.trim().toLowerCase();
   const aisleFilter = els.aisleFilter.value || "all";
   const statusFilter = els.statusFilter.value || "all";
-  const rowLimit = query || aisleFilter !== "all" || statusFilter !== "all" ? 1200 : 500;
+  const rowLimit = query || aisleFilter !== "all" || statusFilter !== "all" ? 1500 : 400;
 
-  const rows = allSkuRows().filter((item) => {
-    const status = statusFor(item);
-    const searchable = [item.sku, item.name, item.code, item.aisleId, item.bayId, item.laneId, item.slotId]
+  const rows = inventoryRows().filter((item) => {
+    const status = item.empty ? "empty" : statusForUnits(item.qty);
+    const searchable = [
+      item.sku,
+      item.name,
+      item.color,
+      item.size,
+      item.code,
+      item.aisleId,
+      item.bayId,
+      item.laneId,
+      item.slotId
+    ]
       .join(" ")
       .toLowerCase();
     return (
@@ -722,101 +861,39 @@ function renderInventoryTable() {
   const visibleRows = rows.slice(0, rowLimit);
 
   if (!rows.length) {
-    els.inventoryTable.innerHTML = `<tr><td colspan="11" class="no-results">No stock lines match the current filters.</td></tr>`;
+    els.inventoryTable.innerHTML = `<tr><td colspan="11" class="no-results">No locations match the current filters.</td></tr>`;
     return;
   }
 
-  els.inventoryTable.innerHTML = visibleRows
-    .map((item) => {
-      const percent = fillPercent(item);
-      const status = statusForPercent(percent);
-      return `
-        <tr>
+  els.inventoryTable.innerHTML =
+    visibleRows
+      .map((item) => {
+        const status = item.empty ? "empty" : statusForUnits(item.qty);
+        const variant = [item.color, item.size].filter(Boolean).join(" / ");
+        return `
+        <tr class="${item.empty ? "empty-row" : ""}">
           <td><strong>${item.code}</strong></td>
           <td>${item.aisleId}</td>
           <td>${item.bayId}</td>
           <td>${item.baySide === "left" ? "Odd / Left" : "Even / Right"}</td>
           <td>${item.laneId}</td>
-          <td>${boxPositionLabel(item)}</td>
-          <td><strong>${item.sku}</strong></td>
-          <td>${item.name}</td>
+          <td>${boxPositionLabel({ id: item.slotId })}</td>
+          <td>${item.sku ? `<strong>${item.sku}</strong>` : "-"}</td>
+          <td>${item.empty ? "<em>Empty box</em>" : `${item.name}${variant ? ` - ${variant}` : ""}`}</td>
           <td>${formatNumber(item.qty)}</td>
-          <td class="stock-cell">
-            <span class="status-tag ${status}">${statusLabel(status)}</span>
-            <div class="stock-bar" style="--fill: ${percent}%; --bar: ${barColor(status)}"><i></i></div>
-          </td>
+          <td class="stock-cell"><span class="status-tag ${status}">${statusLabel(status)}</span></td>
           <td><button class="box-action" data-code="${item.code}" type="button">View</button></td>
         </tr>
       `;
-    })
-    .join("") +
+      })
+      .join("") +
     (rows.length > visibleRows.length
-      ? `<tr><td colspan="11" class="no-results">Showing ${formatNumber(visibleRows.length)} of ${formatNumber(rows.length)} stock lines. Use search or filters to narrow the list.</td></tr>`
+      ? `<tr><td colspan="11" class="no-results">Showing ${formatNumber(
+          visibleRows.length
+        )} of ${formatNumber(rows.length)} locations. Use search or filters to narrow the list.</td></tr>`
       : "");
 
   els.inventoryTable.querySelectorAll(".box-action").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectSlot(button.dataset.code);
-      setView("walkthrough");
-      render();
-    });
-  });
-}
-
-function renderAlerts() {
-  const alerts = allSkuRows()
-    .map((item) => ({ ...item, percent: fillPercent(item), status: statusFor(item) }))
-    .filter((item) => item.status !== "healthy")
-    .sort((a, b) => a.percent - b.percent)
-    .slice(0, 10);
-
-  if (!alerts.length) {
-    els.alertList.innerHTML = `<div class="no-results">No replenishment alerts right now.</div>`;
-    return;
-  }
-
-  els.alertList.innerHTML = alerts
-    .map(
-      (item) => `
-        <article class="alert-card ${item.status}">
-          <header>
-            <h4>${item.sku}</h4>
-            <span class="status-tag ${item.status}">${item.percent}%</span>
-          </header>
-          <p>${item.name}</p>
-          <p>${item.code}</p>
-        </article>
-      `
-    )
-    .join("");
-}
-
-function renderEmptyBoxes() {
-  const emptySlots = allSlots()
-    .filter((slot) => totalUnitsForSlot(slot) === 0 || slot.type === "Empty")
-    .sort((a, b) => a.code.localeCompare(b.code));
-
-  if (!emptySlots.length) {
-    els.emptyBoxList.innerHTML = `<div class="no-results">No empty boxes found. A box appears here when all SKU quantities in that S position are 0 or the S type is set to Empty.</div>`;
-    return;
-  }
-
-  els.emptyBoxList.innerHTML = `<div class="empty-summary">${formatNumber(emptySlots.length)} empty boxes found</div>` + emptySlots
-    .map(
-      (slot) => `
-        <article class="empty-card">
-          <header>
-            <h4>${slot.code}</h4>
-            <span class="status-tag empty">Empty</span>
-          </header>
-          <p>${baySideLabel(slot)} / ${slot.laneId} / ${boxPositionLabel(slot)}</p>
-          <button class="box-action" data-code="${slot.code}" type="button">View</button>
-        </article>
-      `
-    )
-    .join("");
-
-  els.emptyBoxList.querySelectorAll(".box-action").forEach((button) => {
     button.addEventListener("click", () => {
       selectSlot(button.dataset.code);
       setView("walkthrough");
@@ -827,13 +904,178 @@ function renderEmptyBoxes() {
   });
 }
 
+function renderAlerts() {
+  const alerts = allSkuRows()
+    .filter((item) => statusForUnits(item.qty) === "low")
+    .sort((a, b) => a.qty - b.qty)
+    .slice(0, 12);
+
+  if (!alerts.length) {
+    els.alertList.innerHTML = `<div class="no-results">No low-stock lines right now.</div>`;
+    return;
+  }
+
+  els.alertList.innerHTML = alerts
+    .map(
+      (item) => `
+        <article class="alert-card low">
+          <header>
+            <h4>${item.sku}</h4>
+            <span class="status-tag low">${formatNumber(item.qty)} left</span>
+          </header>
+          <p>${item.name}</p>
+          <p>${item.code}</p>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderEmptyFinder() {
+  let emptyBoxes = 0;
+  let emptyRows = 0;
+  let emptyBays = 0;
+  const fullyEmptyBays = [];
+  const bayStats = [];
+
+  state.aisles.forEach((aisle) => {
+    aisle.bays.forEach((bay) => {
+      let bayEmpty = 0;
+      let bayTotal = 0;
+      bay.lanes.forEach((lane) => {
+        const laneEmpty = lane.slots.filter((slot) => slotUnits(slot) === 0).length;
+        if (lane.slots.length && laneEmpty === lane.slots.length) emptyRows += 1;
+        bayEmpty += laneEmpty;
+        bayTotal += lane.slots.length;
+      });
+      emptyBoxes += bayEmpty;
+      const entry = { aisleId: aisle.id, bayId: bay.id, empty: bayEmpty, total: bayTotal };
+      bayStats.push(entry);
+      if (bayTotal && bayEmpty === bayTotal) {
+        emptyBays += 1;
+        fullyEmptyBays.push(entry);
+      }
+    });
+  });
+
+  const replenTargets = bayStats
+    .filter((bay) => bay.empty > 0 && bay.empty < bay.total)
+    .sort((a, b) => b.empty - a.empty)
+    .slice(0, 40);
+
+  const summary = `
+    <div class="empty-summary-grid">
+      <div class="es-empty"><span>Empty boxes</span><strong>${formatNumber(emptyBoxes)}</strong></div>
+      <div class="es-empty"><span>Empty rows</span><strong>${formatNumber(emptyRows)}</strong></div>
+      <div class="es-empty"><span>Empty bays</span><strong>${formatNumber(emptyBays)}</strong></div>
+    </div>
+  `;
+
+  const fullyEmptyBlock = fullyEmptyBays.length
+    ? `<h4 class="finder-heading">Completely empty bays (${formatNumber(fullyEmptyBays.length)})</h4>
+       <div class="chip-row">
+         ${fullyEmptyBays
+           .slice(0, 60)
+           .map(
+             (bay) =>
+               `<button class="loc-chip empty" type="button" data-aisle="${bay.aisleId}" data-bay="${bay.bayId}">${bay.aisleId}.${bay.bayId}</button>`
+           )
+           .join("")}
+         ${fullyEmptyBays.length > 60 ? `<span class="chip-more">+${formatNumber(fullyEmptyBays.length - 60)} more</span>` : ""}
+       </div>`
+    : "";
+
+  const replenBlock = replenTargets.length
+    ? `<h4 class="finder-heading">Bays with the most space to replenish</h4>
+       ${replenTargets
+         .map(
+           (bay) => `
+            <article class="replen-card">
+              <div>
+                <h4>${bay.aisleId}.${bay.bayId}</h4>
+                <p>${formatNumber(bay.empty)} empty of ${formatNumber(bay.total)} boxes</p>
+              </div>
+              <div class="replen-meter" style="--fill:${Math.round((bay.empty / bay.total) * 100)}%"><i></i></div>
+              <button class="box-action" type="button" data-aisle="${bay.aisleId}" data-bay="${bay.bayId}">Open bay</button>
+            </article>
+          `
+         )
+         .join("")}`
+    : `<div class="no-results">Every bay is fully stocked.</div>`;
+
+  els.emptyBoxList.innerHTML = summary + fullyEmptyBlock + replenBlock;
+
+  els.emptyBoxList.querySelectorAll("[data-bay]").forEach((button) => {
+    button.addEventListener("click", () => {
+      jumpToBay(button.dataset.aisle, button.dataset.bay, "row");
+    });
+  });
+}
+
+function renderOtherLocations() {
+  const query = els.globalSearch.value.trim().toLowerCase();
+  const rows = (DATA.other || [])
+    .map(([loc, sku, qty, type, zone]) => {
+      const meta = DATA.skus[sku] || ["", "", ""];
+      return {
+        loc,
+        sku,
+        name: meta[0] || sku,
+        variant: [meta[1], meta[2]].filter(Boolean).join(" / "),
+        qty: Number(qty) || 0,
+        type,
+        zone
+      };
+    })
+    .filter((row) => {
+      if (!query) return true;
+      return [row.loc, row.sku, row.name, row.variant, row.zone, row.type]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+
+  if (!els.otherLocList) return;
+
+  if (!rows.length) {
+    els.otherLocList.innerHTML = `<tr><td colspan="5" class="no-results">No bulk / overflow locations match the search.</td></tr>`;
+    return;
+  }
+
+  const visible = rows.slice(0, 600);
+  els.otherLocList.innerHTML =
+    visible
+      .map(
+        (row) => `
+        <tr>
+          <td><strong>${row.loc}</strong></td>
+          <td>${row.zone}</td>
+          <td>${row.sku || "-"}</td>
+          <td>${row.name}${row.variant ? ` - ${row.variant}` : ""}</td>
+          <td>${formatNumber(row.qty)}</td>
+        </tr>
+      `
+      )
+      .join("") +
+    (rows.length > visible.length
+      ? `<tr><td colspan="5" class="no-results">Showing ${formatNumber(
+          visible.length
+        )} of ${formatNumber(rows.length)} bulk / overflow lines. Use search to narrow the list.</td></tr>`
+      : "");
+}
+
 function renderSkuSelect() {
   const selectedSku = els.skuSelect.value;
-  let rows = allSkuRows().filter((item) => item.aisleId === selectedAisleId && item.bayId === selectedBayId);
+  let rows = allSkuRows().filter(
+    (item) => item.aisleId === selectedAisleId && item.bayId === selectedBayId
+  );
   if (!rows.length) rows = allSkuRows().slice(0, 100);
   rows.sort((a, b) => a.code.localeCompare(b.code));
   els.skuSelect.innerHTML = rows
-    .map((item) => `<option value="${item.code}|${item.sku}">${item.code} / ${item.sku} (${item.qty})</option>`)
+    .map(
+      (item) =>
+        `<option value="${item.code}|${item.sku}">${item.code} / ${item.sku} (${item.qty})</option>`
+    )
     .join("");
   if ([...els.skuSelect.options].some((option) => option.value === selectedSku)) {
     els.skuSelect.value = selectedSku;
@@ -860,7 +1102,7 @@ function adjustStock(code, sku, delta, note) {
   const item = match.slot.skus.find((skuItem) => skuItem.sku === sku);
   if (!item) return;
   const before = item.qty;
-  item.qty = Math.max(0, Math.min(item.max, item.qty + delta));
+  item.qty = Math.max(0, item.qty + delta);
   const applied = item.qty - before;
 
   state.activity.unshift({
@@ -873,7 +1115,10 @@ function adjustStock(code, sku, delta, note) {
 }
 
 function nextNumber(collection, prefix) {
-  const max = collection.reduce((highest, item) => Math.max(highest, codeNumber(item.id)), 0);
+  const max = collection.reduce(
+    (highest, item) => Math.max(highest, codeNumber(item.id)),
+    0
+  );
   return max + 1;
 }
 
@@ -891,7 +1136,12 @@ function addAisle() {
   selectedAisleId = aisle.id;
   selectedBayId = aisle.bays[0].id;
   selectedLaneId = aisle.bays[0].lanes[0].id;
-  selectedSlotCode = locationCode(aisle, aisle.bays[0], aisle.bays[0].lanes[0], aisle.bays[0].lanes[0].slots[0]);
+  selectedSlotCode = locationCode(
+    aisle,
+    aisle.bays[0],
+    aisle.bays[0].lanes[0],
+    aisle.bays[0].lanes[0].slots[0]
+  );
   saveState();
   render();
 }
@@ -960,7 +1210,9 @@ function setView(view) {
   els.walkthroughView.classList.toggle("active-view", view === "walkthrough");
   els.layoutView.classList.toggle("active-view", view === "layout");
   els.dashboardView.classList.toggle("active-view", view === "dashboard");
-  els.navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+  els.navButtons.forEach((button) =>
+    button.classList.toggle("active", button.dataset.view === view)
+  );
   if (view === "walkthrough") setTimeout(renderWarehouse3d, 0);
 }
 
@@ -972,7 +1224,9 @@ function renderWarehouse3d() {
     row: renderWarehouseRows,
     box: renderWarehouseBoxes
   };
-  els.warehouse3d.className = `warehouse-3d mode-${warehouseMode}`;
+  els.warehouse3d.className = `warehouse-3d mode-${warehouseMode}${
+    emptyFocus ? " empty-focus" : ""
+  }`;
   els.warehouse3d.innerHTML = renderers[warehouseMode]();
   bindWarehouse3dActions();
 }
@@ -981,21 +1235,26 @@ function renderWarehouseOverview() {
   const slots = allSlots();
   return `
     <div class="warehouse-perspective overview-perspective">
-      ${state.aisles.map((aisle) => {
-        const aisleSlots = slots.filter((slot) => slot.aisleId === aisle.id);
-        const summary = stockSummaryForSlots(aisleSlots);
-        const low = aisleSlots.filter((slot) => statusFor(slot) === "low").length;
-        return `
-          <button type="button" class="wh-aisle-card ${summary.status} ${aisle.id === selectedAisleId ? "selected" : ""}" data-aisle-id="${aisle.id}">
+      ${state.aisles
+        .map((aisle) => {
+          const aisleSlots = slots.filter((slot) => slot.aisleId === aisle.id);
+          const summary = stockSummaryForSlots(aisleSlots);
+          const emptyBays = aisle.bays.filter((bay) =>
+            bay.lanes.every((lane) => lane.slots.every((slot) => slotUnits(slot) === 0))
+          ).length;
+          return `
+          <button type="button" class="wh-aisle-card ${summary.status} ${
+            aisle.id === selectedAisleId ? "selected" : ""
+          }" data-aisle-id="${aisle.id}">
             <span class="wh-aisle-title">${aisle.id}</span>
-            <span class="wh-aisle-sub">${aisle.name || aisle.zone}</span>
-            <span class="wh-rack-pair">
-              <i></i><i></i>
-            </span>
-            <span class="wh-aisle-meta">${summary.percent}% full / ${low} low</span>
+            <span class="wh-aisle-sub">${aisle.name || `${aisle.bays.length} bays`}</span>
+            <span class="wh-rack-pair"><i></i><i></i></span>
+            <span class="wh-aisle-meta">${formatNumber(summary.emptyCount)} empty boxes</span>
+            <span class="wh-aisle-meta">${emptyBays} empty bays</span>
           </button>
         `;
-      }).join("")}
+        })
+        .join("")}
     </div>
   `;
 }
@@ -1012,7 +1271,14 @@ function renderWarehouseAisle() {
         ${renderBayWall(aisle, "left")}
       </div>
       <div class="walkway-3d">
-        ${aisle.bays.map((bay) => `<button type="button" class="bay-floor-marker ${bay.id === selectedBayId ? "selected" : ""}" data-bay-id="${bay.id}">${bay.id}</button>`).join("")}
+        ${aisle.bays
+          .map(
+            (bay) =>
+              `<button type="button" class="bay-floor-marker ${
+                bay.id === selectedBayId ? "selected" : ""
+              }" data-bay-id="${bay.id}">${bay.id}</button>`
+          )
+          .join("")}
       </div>
       <div class="rack-wall right-wall">
         ${renderBayWall(aisle, "right")}
@@ -1023,22 +1289,31 @@ function renderWarehouseAisle() {
 
 function renderBayWall(aisle, side) {
   return aisle.bays
-    .filter((bay) => (bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right")) === side)
+    .filter(
+      (bay) => (bay.side || (codeNumber(bay.id) % 2 === 1 ? "left" : "right")) === side
+    )
     .map((bay) => {
-      const slots = bay.lanes.flatMap((lane) => lane.slots.map((slot) => ({
-        ...slot,
-        code: locationCode(aisle, bay, lane, slot),
-        aisleId: aisle.id,
-        bayId: bay.id,
-        baySide: side,
-        laneId: lane.id,
-        slotId: slot.id
-      })));
+      const slots = bay.lanes.flatMap((lane) =>
+        lane.slots.map((slot) => ({
+          ...slot,
+          code: locationCode(aisle, bay, lane, slot),
+          aisleId: aisle.id,
+          bayId: bay.id,
+          baySide: side,
+          laneId: lane.id,
+          slotId: slot.id
+        }))
+      );
       const summary = stockSummaryForSlots(slots);
       return `
-        <button type="button" class="rack-bay ${summary.status} ${bay.id === selectedBayId ? "selected" : ""}" data-bay-id="${bay.id}">
-          <span>${bay.id}</span>
-          <span class="rack-bay-boxes">${slots.slice(0, 18).map((slot) => `<i class="${statusFor(slot)}"></i>`).join("")}</span>
+        <button type="button" class="rack-bay ${summary.status} ${
+        bay.id === selectedBayId ? "selected" : ""
+      }" data-bay-id="${bay.id}">
+          <span>${bay.id}<small>${summary.emptyCount} empty</small></span>
+          <span class="rack-bay-boxes">${slots
+            .slice(0, 21)
+            .map((slot) => `<i class="${statusFor(slot)}"></i>`)
+            .join("")}</span>
         </button>
       `;
     })
@@ -1052,11 +1327,15 @@ function renderWarehouseRows() {
     <div class="row-scene">
       <div class="row-scene-header">
         <strong>${aisle.id}.${bay.id}</strong>
-        <span>${baySideLabel(bay)} / shelf rows ${bay.lanes[0]?.id} to ${bay.lanes[bay.lanes.length - 1]?.id}</span>
+        <span>${baySideLabel(bay)} / shelf rows ${bay.lanes[0]?.id} to ${
+    bay.lanes[bay.lanes.length - 1]?.id
+  }</span>
       </div>
       <div class="row-rack">
-        ${bay.lanes.slice().reverse().map((lane) => `
-          ${(() => {
+        ${bay.lanes
+          .slice()
+          .reverse()
+          .map((lane) => {
             const laneSlots = lane.slots.map((slot) => ({
               ...slot,
               code: locationCode(aisle, bay, lane, slot),
@@ -1067,17 +1346,24 @@ function renderWarehouseRows() {
             }));
             const summary = stockSummaryForSlots(laneSlots);
             return `
-          <button type="button" class="shelf-row ${summary.status} ${lane.id === selectedLaneId ? "selected" : ""}" data-lane-id="${lane.id}">
-            <span class="shelf-row-label">${lane.id}</span>
+          <button type="button" class="shelf-row ${summary.status} ${
+              lane.id === selectedLaneId ? "selected" : ""
+            }" data-lane-id="${lane.id}">
+            <span class="shelf-row-label">${lane.id}<small>${summary.emptyCount} empty</small></span>
             <span class="shelf-row-boxes">
-              ${laneSlots.map((slot) => {
-                return `<i class="${statusFor(slot)} ${slot.code === selectedSlotCode ? "selected" : ""}" data-code="${slot.code}">${boxPositionLabel(slot)}</i>`;
-              }).join("")}
+              ${laneSlots
+                .map(
+                  (slot) =>
+                    `<i class="${statusFor(slot)} ${
+                      slot.code === selectedSlotCode ? "selected" : ""
+                    }" data-code="${slot.code}">${boxPositionLabel(slot)}</i>`
+                )
+                .join("")}
             </span>
           </button>
             `;
-          })()}
-        `).join("")}
+          })
+          .join("")}
       </div>
     </div>
   `;
@@ -1091,21 +1377,25 @@ function renderWarehouseBoxes() {
     <div class="box-scene">
       <div class="row-scene-header">
         <strong>${aisle.id}.${bay.id}.${lane.id}</strong>
-        <span>Boxes are left-to-right: S1, S2, S3, S4, S5, S6</span>
+        <span>Boxes left-to-right: S1 to S${SLOT_COUNT}</span>
       </div>
       <div class="box-line">
-        ${lane.slots.map((slot) => {
-          const code = locationCode(aisle, bay, lane, slot);
-          const slotInfo = { ...slot, code, aisleId: aisle.id, bayId: bay.id, laneId: lane.id, slotId: slot.id };
-          const percent = fillPercent(slotInfo);
-          return `
-            <button type="button" class="box-position ${statusFor(slotInfo)} ${code === selectedSlotCode ? "selected" : ""}" data-code="${code}">
+        ${lane.slots
+          .map((slot) => {
+            const code = locationCode(aisle, bay, lane, slot);
+            const units = slotUnits(slot);
+            const status = statusForUnits(units);
+            return `
+            <button type="button" class="box-position ${status} ${
+              code === selectedSlotCode ? "selected" : ""
+            }" data-code="${code}">
               <strong>${boxPositionLabel(slot)}</strong>
-              <span>${slot.id}</span>
-              <em style="--fill:${percent}%"></em>
+              <span>${status === "empty" ? "Empty" : `${formatNumber(units)} units`}</span>
+              <em style="--fill:${fillPercent(slot)}%"></em>
             </button>
           `;
-        }).join("")}
+          })
+          .join("")}
       </div>
     </div>
   `;
@@ -1118,7 +1408,14 @@ function bindWarehouse3dActions() {
       const aisle = getAisle();
       selectedBayId = aisle.bays[0]?.id;
       selectedLaneId = aisle.bays[0]?.lanes[0]?.id;
-      if (aisle.bays[0]?.lanes[0]?.slots[0]) selectedSlotCode = locationCode(aisle, aisle.bays[0], aisle.bays[0].lanes[0], aisle.bays[0].lanes[0].slots[0]);
+      if (aisle.bays[0]?.lanes[0]?.slots[0]) {
+        selectedSlotCode = locationCode(
+          aisle,
+          aisle.bays[0],
+          aisle.bays[0].lanes[0],
+          aisle.bays[0].lanes[0].slots[0]
+        );
+      }
       warehouseMode = "aisle";
       updateWarehouseModeButtons();
       render();
@@ -1131,7 +1428,9 @@ function bindWarehouse3dActions() {
       bayIndex = aisle.bays.findIndex((bay) => bay.id === selectedBayId);
       const bay = getBay();
       selectedLaneId = bay.lanes[0]?.id;
-      if (bay.lanes[0]?.slots[0]) selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+      if (bay.lanes[0]?.slots[0]) {
+        selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+      }
       warehouseMode = "row";
       updateWarehouseModeButtons();
       render();
@@ -1141,19 +1440,28 @@ function bindWarehouse3dActions() {
     button.addEventListener("click", () => {
       selectedLaneId = button.dataset.laneId;
       const lane = getLane();
-      if (lane.slots[0]) selectedSlotCode = locationCode(getAisle(), getBay(), lane, lane.slots[0]);
+      if (lane.slots[0]) {
+        selectedSlotCode = locationCode(getAisle(), getBay(), lane, lane.slots[0]);
+      }
       warehouseMode = "box";
       updateWarehouseModeButtons();
       render();
     });
   });
   els.warehouse3d.querySelectorAll("[data-code]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
       selectSlot(button.dataset.code);
       warehouseMode = "box";
       updateWarehouseModeButtons();
       render();
     });
+  });
+}
+
+function updateWarehouseModeButtons() {
+  els.warehouseModeButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.warehouseMode === warehouseMode);
   });
 }
 
@@ -1164,12 +1472,6 @@ els.navButtons.forEach((button) => {
   });
 });
 
-function updateWarehouseModeButtons() {
-  els.warehouseModeButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.warehouseMode === warehouseMode);
-  });
-}
-
 els.warehouseModeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     warehouseMode = button.dataset.warehouseMode;
@@ -1178,13 +1480,26 @@ els.warehouseModeButtons.forEach((button) => {
   });
 });
 
+if (els.emptyHighlightButton) {
+  els.emptyHighlightButton.addEventListener("click", () => {
+    emptyFocus = !emptyFocus;
+    els.emptyHighlightButton.classList.toggle("active", emptyFocus);
+    els.emptyHighlightButton.textContent = emptyFocus
+      ? "Showing empties"
+      : "Highlight empties";
+    renderWarehouse3d();
+  });
+}
+
 els.prevBayButton.addEventListener("click", () => {
   const aisle = getAisle();
   bayIndex = Math.max(0, bayIndex - 1);
   selectedBayId = aisle.bays[bayIndex].id;
   const bay = getBay();
   selectedLaneId = bay.lanes[0]?.id;
-  if (bay.lanes[0]?.slots[0]) selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+  if (bay.lanes[0]?.slots[0]) {
+    selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+  }
   render();
 });
 
@@ -1194,7 +1509,9 @@ els.nextBayButton.addEventListener("click", () => {
   selectedBayId = aisle.bays[bayIndex].id;
   const bay = getBay();
   selectedLaneId = bay.lanes[0]?.id;
-  if (bay.lanes[0]?.slots[0]) selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+  if (bay.lanes[0]?.slots[0]) {
+    selectedSlotCode = locationCode(aisle, bay, bay.lanes[0], bay.lanes[0].slots[0]);
+  }
   render();
 });
 
@@ -1218,7 +1535,7 @@ els.stockForm.addEventListener("submit", (event) => {
 });
 
 els.resetDataButton.addEventListener("click", () => {
-  state = makeInitialState();
+  state = buildStateFromData();
   const slot = firstSlot();
   selectedAisleId = state.aisles[0].id;
   selectedBayId = state.aisles[0].bays[0].id;
