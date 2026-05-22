@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Virtual Warehouse Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand-block">
+          <div class="brand-mark">VW</div>
+          <div>
+            <h1>Virtual Warehouse</h1>
+            <p>Odd/even bay stock control</p>
+          </div>
+        </div>
+
+        <nav class="nav-stack" aria-label="Views">
+          <button class="nav-button active" data-view="walkthrough" type="button">
+            <span class="nav-icon">3D</span>
+            Walkthrough
+          </button>
+          <button class="nav-button" data-view="layout" type="button">
+            <span class="nav-icon">L</span>
+            Layout Builder
+          </button>
+          <button class="nav-button" data-view="dashboard" type="button">
+            <span class="nav-icon">D</span>
+            Dashboard
+          </button>
+        </nav>
+
+        <section class="quick-panel" aria-label="Warehouse summary">
+          <h2>Facility</h2>
+          <dl class="metric-list">
+            <div>
+              <dt>Aisles</dt>
+              <dd id="metricAisles">0</dd>
+            </div>
+            <div>
+              <dt>Bays</dt>
+              <dd id="metricBays">0</dd>
+            </div>
+            <div>
+              <dt>Box Positions</dt>
+              <dd id="metricSlots">0</dd>
+            </div>
+            <div>
+              <dt>Units</dt>
+              <dd id="metricUnits">0</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="quick-panel" aria-label="Stock health">
+          <h2>Stock Health</h2>
+          <div class="health-stack">
+            <div class="health-row good">
+              <span>Healthy</span>
+              <strong id="metricHealthy">0</strong>
+            </div>
+            <div class="health-row watch">
+              <span>Watch</span>
+              <strong id="metricWatch">0</strong>
+            </div>
+            <div class="health-row low">
+              <span>Low</span>
+              <strong id="metricLow">0</strong>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Warehouse OS</p>
+            <h2 id="pageTitle">Walkthrough</h2>
+          </div>
+          <div class="topbar-actions">
+            <label class="search-field" for="globalSearch">
+              <span>Search</span>
+              <input id="globalSearch" type="search" placeholder="A01.B17.L05.S2, SKU, bay, product" />
+            </label>
+            <button class="utility-button" id="resetDataButton" type="button" title="Reset demo data">Reset</button>
+          </div>
+        </header>
+
+        <section id="walkthroughView" class="view active-view" aria-labelledby="pageTitle">
+          <div class="walk-layout">
+            <section class="visual-panel" aria-label="Virtual warehouse walkthrough">
+              <div class="panel-toolbar">
+                <div class="segmented" id="warehouseModeSelector" aria-label="Warehouse view selector">
+                  <button class="active" data-warehouse-mode="overview" type="button">Overview</button>
+                  <button data-warehouse-mode="aisle" type="button">Aisle Lane</button>
+                  <button data-warehouse-mode="row" type="button">Rows</button>
+                  <button data-warehouse-mode="box" type="button">Boxes</button>
+                </div>
+                <div class="stepper">
+                  <button id="prevBayButton" type="button" title="Previous bay">Prev</button>
+                  <span id="currentBayLabel">B01</span>
+                  <button id="nextBayButton" type="button" title="Next bay">Next</button>
+                </div>
+              </div>
+              <div class="aisle-strip" id="aisleSelector" aria-label="Aisle selector"></div>
+
+              <div class="three-stage">
+                <div id="warehouse3d" class="warehouse-3d" aria-label="Interactive warehouse visual"></div>
+                <div class="three-hud">
+                  <span>Overview: 15 aisles</span>
+                  <span>Odd bays left, even bays right</span>
+                  <span>Boxes run S1 to S6 left-to-right</span>
+                </div>
+              </div>
+            </section>
+
+            <aside class="detail-panel" aria-label="Selected warehouse detail">
+              <div class="detail-header">
+                <div>
+                  <p class="eyebrow">Selected Location</p>
+                  <h3 id="selectedSlotTitle">Select a slot</h3>
+                </div>
+                <span class="status-pill" id="selectedSlotStatus">Idle</span>
+              </div>
+              <div id="slotDetail" class="box-detail empty-detail">
+                Choose any S position in the 3D view, map, or layout builder to see SKUs and stock levels.
+              </div>
+            </aside>
+          </div>
+
+          <section class="map-panel" aria-label="Warehouse map">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Overhead</p>
+                <h3>A/B/L/S Map</h3>
+              </div>
+              <div class="legend">
+                <span><i class="legend-dot healthy"></i>Healthy</span>
+                <span><i class="legend-dot watch"></i>Watch</span>
+                <span><i class="legend-dot low"></i>Low</span>
+              </div>
+            </div>
+            <div id="warehouseMap" class="warehouse-map"></div>
+          </section>
+        </section>
+
+        <section id="layoutView" class="view" aria-labelledby="pageTitle">
+          <div class="builder-grid">
+            <section class="layout-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Drag Drop</p>
+                  <h3>Layout Builder</h3>
+                </div>
+                <div class="builder-actions">
+                  <button class="utility-button" id="addAisleButton" type="button">Add Aisle</button>
+                  <button class="utility-button" id="addBayButton" type="button">Add Bay</button>
+                  <button class="utility-button" id="addLaneButton" type="button">Add Level</button>
+                  <button class="utility-button" id="addSlotButton" type="button">Add Box Slot</button>
+                  <button class="danger-button" id="removeSelectedButton" type="button">Remove Selected</button>
+                </div>
+              </div>
+              <div id="layoutCanvas" class="layout-canvas" aria-label="Draggable warehouse layout"></div>
+            </section>
+
+            <aside class="layout-panel editor-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Customize</p>
+                  <h3>Selected Structure</h3>
+                </div>
+              </div>
+              <div id="structureEditor" class="structure-editor"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="dashboardView" class="view" aria-labelledby="pageTitle">
+          <div class="dashboard-grid">
+            <section class="dashboard-panel wide-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Admin</p>
+                  <h3>Inventory Control</h3>
+                </div>
+                <div class="filter-row">
+                  <select id="aisleFilter" aria-label="Filter by aisle"></select>
+                  <select id="statusFilter" aria-label="Filter by stock status">
+                    <option value="all">All statuses</option>
+                    <option value="healthy">Healthy</option>
+                    <option value="watch">Watch</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Aisle</th>
+                      <th>Bay</th>
+                      <th>Side</th>
+                      <th>L</th>
+                      <th>Box</th>
+                      <th>SKU</th>
+                      <th>Product</th>
+                      <th>Units</th>
+                      <th>Stock</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventoryTable"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="dashboard-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Alerts</p>
+                  <h3>Low Stock</h3>
+                </div>
+              </div>
+              <div id="alertList" class="alert-list"></div>
+            </section>
+
+            <section class="dashboard-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Availability</p>
+                  <h3>Empty Boxes</h3>
+                </div>
+              </div>
+              <div id="emptyBoxList" class="alert-list"></div>
+            </section>
+
+            <section class="dashboard-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Replenishment</p>
+                  <h3>Stock Editor</h3>
+                </div>
+              </div>
+              <form id="stockForm" class="stock-form">
+                <label>
+                  SKU Location
+                  <select id="skuSelect"></select>
+                </label>
+                <label>
+                  Adjustment
+                  <input id="adjustmentInput" type="number" min="-999" max="999" value="12" />
+                </label>
+                <label>
+                  Note
+                  <input id="noteInput" type="text" placeholder="Cycle count, pick, receipt" />
+                </label>
+                <button class="primary-button" type="submit">Apply Stock Change</button>
+              </form>
+            </section>
+
+            <section class="dashboard-panel wide-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">History</p>
+                  <h3>Activity Log</h3>
+                </div>
+              </div>
+              <div id="activityLog" class="activity-log"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
