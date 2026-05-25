@@ -11,6 +11,11 @@ const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+const ALLOWED_DOMAINS = (process.env.ALLOWED_DOMAINS || '')
+  .split(',')
+  .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+  .filter(Boolean);
+
 const COOKIE_NAME = 'session';
 const SESSION_TTL_DAYS = 30;
 const SCRYPT_KEYLEN = 64;
@@ -19,9 +24,12 @@ const PASSWORD_MIN_LENGTH = 8;
 export function isAllowed(email) {
   if (!email) return false;
   const e = email.toLowerCase();
-  if (ALLOWED_EMAILS.length === 0) return false;
-  if (ALLOWED_EMAILS.includes('*')) return true;
-  return ALLOWED_EMAILS.includes(e);
+  if (ALLOWED_EMAILS.includes('*') || ALLOWED_DOMAINS.includes('*')) return true;
+  if (ALLOWED_EMAILS.includes(e)) return true;
+  const at = e.lastIndexOf('@');
+  if (at < 0) return false;
+  const domain = e.slice(at + 1);
+  return ALLOWED_DOMAINS.includes(domain);
 }
 
 export function validateEmail(email) {

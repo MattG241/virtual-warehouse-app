@@ -66,7 +66,8 @@ Add these to Railway → service → **Variables**:
 | Variable         | Value                                                                                                                       |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `JWT_SECRET`     | A 48+ byte random string. Generate locally: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `ALLOWED_EMAILS` | Comma-separated emails allowed to register accounts. Use `*` to allow any.                                                  |
+| `ALLOWED_DOMAINS` | Comma-separated domains allowed to register, e.g. `ryderwear.com.au`. Anyone with a matching email address can create an account. |
+| `ALLOWED_EMAILS` | Optional. Specific emails allowed in addition to (or instead of) `ALLOWED_DOMAINS`. Use `*` in either to allow any.         |
 | `NODE_ENV`       | Set to `production` so session cookies are flagged `Secure`.                                                                |
 
 That's it — no external email service required. Passwords are hashed with scrypt (Node built-in) and stored in the `users` table. Anyone whose email is in `ALLOWED_EMAILS` can hit **Sign in → Create one** on first visit, pick a password, and they're in. Subsequent visits use email + password.
