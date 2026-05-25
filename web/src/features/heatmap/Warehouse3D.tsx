@@ -306,13 +306,23 @@ function SceneCamera({
     centre[1] + distance * 0.8,
     centre[2] + distance,
   ]
+  // Near/far must scale with the scene — the camera is `distance` units from
+  // the target along an isometric vector (~1.7× `distance` in length), so a
+  // big warehouse can sit hundreds of world units in front of the lens. Fixed
+  // small values clipped the entire scene to a blank canvas on real data.
+  const depth = Math.max(500, size * 5)
+  // Cap zoom for tiny scenes (so a 1-aisle test warehouse doesn't fill the
+  // viewport at 360×); for large scenes we want to *decrease* zoom so the
+  // whole warehouse frames in initial view. The previous Math.max floor of 20
+  // forced large warehouses to render zoomed into a single bay.
+  const zoom = Math.min(40, 360 / Math.max(size, 1))
   return (
     <OrthographicCamera
       makeDefault
       position={pos}
-      zoom={Math.max(20, 360 / size)}
-      near={-200}
-      far={200}
+      zoom={zoom}
+      near={-depth}
+      far={depth}
     />
   )
 }
