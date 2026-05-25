@@ -41,6 +41,60 @@ export async function logout() {
   })
 }
 
+export async function registerUser(email: string, password: string) {
+  const res = await fetch(`${BASE}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'web' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'registration failed')
+  }
+  return res.json()
+}
+
+export interface LayoutDoc {
+  aisles: LayoutAisle[]
+  dataVersion?: string
+}
+
+export interface LayoutAisle {
+  id: string
+  name?: string
+  zone?: string
+  bays: LayoutBay[]
+}
+
+export interface LayoutBay {
+  id: string
+  side: 'left' | 'right'
+  lanes: { id: string; slots: { id: string }[] }[]
+}
+
+export async function fetchLayout(): Promise<LayoutDoc | null> {
+  const res = await fetch(`${BASE}/api/layout`, { credentials: 'include' })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`/api/layout ${res.status}`)
+  const data = await res.json()
+  return data.layout
+}
+
+export async function saveLayout(layout: LayoutDoc) {
+  const res = await fetch(`${BASE}/api/layout`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'web' },
+    credentials: 'include',
+    body: JSON.stringify(layout),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `/api/layout PUT ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function syncNow() {
   const res = await fetch(`${BASE}/api/sync-now`, {
     method: 'POST',
