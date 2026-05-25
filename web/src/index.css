@@ -102,3 +102,31 @@ body {
 
 /* Numbers tabular */
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* Warehouse floor — concrete-ish texture with depth lines */
+.warehouse-floor {
+  background:
+    linear-gradient(180deg, rgb(var(--surface) / 0.4) 0%, rgb(var(--bg) / 0.6) 100%),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 24px,
+      rgb(var(--line) / 0.05) 24px 25px
+    );
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line-strong) / 0.6) transparent;
+}
+
+.floor-grid {
+  background-image:
+    linear-gradient(to top, rgb(var(--bg) / 0.7), transparent),
+    repeating-linear-gradient(
+      90deg,
+      rgb(var(--line) / 0.25) 0 1px,
+      transparent 1px 36px
+    );
+  mask-image: linear-gradient(to top, black 30%, transparent);
+}
+
+/* Subtle wiggle on hover for rack boxes */
+.rack:hover { z-index: 1; }
+

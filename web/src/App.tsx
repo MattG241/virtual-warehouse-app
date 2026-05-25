@@ -2,6 +2,10 @@ import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { CommandCentre } from '@/routes/CommandCentre'
+import { Warehouse } from '@/routes/Warehouse'
+import { AisleView } from '@/routes/AisleView'
+import { Scan } from '@/routes/Scan'
+import { Reports } from '@/routes/Reports'
 import { Placeholder } from '@/routes/Placeholder'
 import { applyTheme, useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
@@ -47,7 +51,15 @@ export default function App() {
           path="/warehouse"
           element={
             <AppShell title="Warehouse">
-              <Placeholder title="3D Warehouse Heatmap" />
+              <Warehouse />
+            </AppShell>
+          }
+        />
+        <Route
+          path="/warehouse/:aisleId"
+          element={
+            <AppShell title="Aisle walk-through">
+              <AisleView />
             </AppShell>
           }
         />
@@ -71,7 +83,7 @@ export default function App() {
           path="/reports"
           element={
             <AppShell title="Reports">
-              <Placeholder title="Reports & exports" />
+              <Reports />
             </AppShell>
           }
         />
@@ -79,7 +91,7 @@ export default function App() {
           path="/scan"
           element={
             <AppShell title="Scan">
-              <Placeholder title="Barcode scanner" />
+              <Scan />
             </AppShell>
           }
         />
