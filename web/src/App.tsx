@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { CommandCentreSwitch } from '@/routes/CommandCentreSwitch'
 import { WarehouseSwitch } from '@/routes/WarehouseSwitch'
 import { AisleView } from '@/routes/AisleView'
+// Lazy: pulls ~300KB of three.js, only when the user opens the 3D view
+const Heatmap = lazy(() => import('@/routes/Heatmap').then((m) => ({ default: m.Heatmap })))
 import { Scan } from '@/routes/Scan'
 import { Reports } from '@/routes/Reports'
 import { InventorySwitch } from '@/routes/InventorySwitch'
@@ -81,6 +83,22 @@ export default function App() {
           element={
             <AppShell title="Aisle walk-through">
               <AisleView />
+            </AppShell>
+          }
+        />
+        <Route
+          path="/heatmap"
+          element={
+            <AppShell title="3D heatmap">
+              <Suspense
+                fallback={
+                  <div className="grid h-[calc(100dvh-9rem)] place-items-center text-sm text-muted">
+                    Loading 3D engine…
+                  </div>
+                }
+              >
+                <Heatmap />
+              </Suspense>
             </AppShell>
           }
         />

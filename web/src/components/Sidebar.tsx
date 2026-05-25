@@ -9,6 +9,7 @@ import {
   Bell,
   ArrowDownToLine,
   Route as RouteIcon,
+  Box,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -21,6 +22,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Command Centre', icon: LayoutGrid },
+  { to: '/heatmap', label: '3D heatmap', icon: Box },
   { to: '/warehouse', label: 'Warehouse', icon: Boxes },
   { to: '/inventory', label: 'Inventory', icon: PackageSearch },
   { to: '/pick', label: 'Pick route', icon: RouteIcon },
