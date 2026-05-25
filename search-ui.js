@@ -239,21 +239,62 @@
   }
 
   function jumpToCode(code) {
-    const m = /^A0?(\d+)\.B0?(\d+)/i.exec(code);
+    const m = /^A0*(\d+)\.B0*(\d+)/i.exec(code);
     if (!m) return;
-    const aisleNumber = String(Number(m[1]));
-    // Click the matching aisle button if visible
-    const aisleBtn =
-      document.querySelector(`#aisleSelector button[data-aisle-number="${aisleNumber}"]`) ||
-      Array.from(document.querySelectorAll('#aisleSelector button')).find(
-        (b) => b.textContent.trim() === `A${aisleNumber.padStart(2, '0')}`,
-      );
-    if (aisleBtn) aisleBtn.click();
-    // Scroll to the highlighted box so it's visible
+    const aisleId = `A${String(m[1]).padStart(2, '0')}`;
+    const bayId = `B${String(m[2]).padStart(2, '0')}`;
+
+    // 1. Switch to walkthrough view if we aren't on it
+    const walkthroughNav = document.querySelector('[data-view="walkthrough"]');
+    if (walkthroughNav && !walkthroughNav.classList.contains('active')) {
+      walkthroughNav.click();
+    }
+
+    // 2. Force overview mode so the data-aisle-id buttons exist in warehouse3d.
+    //    app.js only re-renders the warehouse3d hierarchy on mode change.
+    const overviewBtn = document.querySelector('[data-warehouse-mode="overview"]');
+    overviewBtn?.click();
+
+    // Chain through the hierarchy: click in warehouse3d at each level so
+    // app.js bumps warehouseMode to "aisle" → "row" → "box" along the way.
+    const tryClick = (selector) => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.click();
+        return true;
+      }
+      return false;
+    };
+
     setTimeout(() => {
-      const target = document.querySelector(`[data-code="${cssEscape(code)}"]`);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 180);
+      // 3. Aisle: click in warehouse3d (not the strip — that doesn't change mode)
+      if (!tryClick(`#warehouse3d [data-aisle-id="${cssEscape(aisleId)}"]`)) {
+        // Fall back to the strip button just to highlight the aisle even if we
+        // can't drill in.
+        const stripBtn = Array.from(document.querySelectorAll('#aisleSelector button')).find(
+          (b) => b.textContent.trim() === aisleId,
+        );
+        stripBtn?.click();
+      }
+
+      setTimeout(() => {
+        // 4. Bay → bumps to "row" mode
+        tryClick(`#warehouse3d [data-bay-id="${cssEscape(bayId)}"]`);
+
+        setTimeout(() => {
+          // 5. Slot → final selection + scroll into view
+          const target = document.querySelector(`[data-code="${cssEscape(code)}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.click();
+          } else {
+            document
+              .querySelector('.search-hit')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 240);
+      }, 240);
+    }, 220);
   }
 
   function setActiveChip(label, locCount) {
