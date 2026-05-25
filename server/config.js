@@ -18,7 +18,7 @@ function loadConfig() {
       template: process.env.PVX_TEMPLATE || 'Item inventory by location',
       columns:
         process.env.PVX_COLUMNS ||
-        '[Item Code],[Name],[Stock Count],[Container Barcode],[Location barcode],[Site reference],[Location type],[Item type group]',
+        '[Item Code],[Name],[Stock Count],[Container Barcode],[Location barcode],[Site reference],[Location type],[Item type group],[Item Barcode]',
     },
     sync: {
       intervalMs: Number(process.env.SYNC_INTERVAL_MS || 300000),

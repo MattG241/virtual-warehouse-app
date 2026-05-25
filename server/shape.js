@@ -24,7 +24,8 @@ export async function buildWarehouseData() {
   const [stockRes, syncRes, layoutRes] = await Promise.all([
     pool.query(
       `SELECT item_code, item_name, stock_count, container_barcode,
-              location_barcode, site_reference, location_type, item_type_group
+              location_barcode, site_reference, location_type, item_type_group,
+              item_barcode
          FROM stock_items
         WHERE stock_count > 0`,
     ),
@@ -42,6 +43,7 @@ export async function buildWarehouseData() {
   const grid = {};
   const other = [];
   const skus = {};
+  const barcodeToSku = {};
   const observedAisleBays = {};
   let maxLevel = 0;
   let maxSlot = 0;
@@ -52,6 +54,9 @@ export async function buildWarehouseData() {
       // — they're encoded in the SKU suffix — so we leave those blank and let the
       // visualiser fall back to the SKU code for display.
       skus[r.item_code] = [r.item_name || '', '', ''];
+    }
+    if (r.item_barcode && !barcodeToSku[r.item_barcode]) {
+      barcodeToSku[r.item_barcode] = r.item_code;
     }
 
     const m = GRID_RE.exec(r.location_barcode);
@@ -96,6 +101,7 @@ export async function buildWarehouseData() {
     levels: Math.max(maxLevel, DEFAULT_LEVELS),
     slots: Math.max(maxSlot, DEFAULT_SLOTS),
     skus,
+    barcodeToSku,
     grid,
     other,
     layout,

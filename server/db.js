@@ -19,8 +19,12 @@ export async function initSchema() {
       site_reference    TEXT NOT NULL DEFAULT '',
       location_type     TEXT NOT NULL DEFAULT '',
       item_type_group   TEXT NOT NULL DEFAULT '',
+      item_barcode      TEXT NOT NULL DEFAULT '',
       PRIMARY KEY (item_code, location_barcode, container_barcode, site_reference)
     );
+
+    -- Migration for existing installs that pre-date the item_barcode column.
+    ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS item_barcode TEXT NOT NULL DEFAULT '';
 
     CREATE INDEX IF NOT EXISTS stock_items_location_idx ON stock_items(location_barcode);
     CREATE INDEX IF NOT EXISTS stock_items_item_idx ON stock_items(item_code);

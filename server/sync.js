@@ -63,6 +63,7 @@ export async function runSyncOnce() {
       site_reference: r[idx['Site reference']] ?? '',
       location_type: r[idx['Location type']] ?? '',
       item_type_group: r[idx['Item type group']] ?? '',
+      item_barcode: r[idx['Item Barcode']] ?? '',
     })).filter((r) => r.item_code && r.location_barcode);
 
     // Dedupe in JS (same PK shows up if PVX yields the same combo twice).
@@ -159,9 +160,9 @@ async function bulkInsert(tx, rows) {
     const values = [];
     const params = [];
     chunk.forEach((r, j) => {
-      const o = j * 8;
+      const o = j * 9;
       values.push(
-        `($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5},$${o + 6},$${o + 7},$${o + 8})`,
+        `($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5},$${o + 6},$${o + 7},$${o + 8},$${o + 9})`,
       );
       params.push(
         r.item_code,
@@ -172,11 +173,12 @@ async function bulkInsert(tx, rows) {
         r.site_reference,
         r.location_type,
         r.item_type_group,
+        r.item_barcode,
       );
     });
     await tx.query(
       `INSERT INTO stock_items
-        (item_code, item_name, stock_count, container_barcode, location_barcode, site_reference, location_type, item_type_group)
+        (item_code, item_name, stock_count, container_barcode, location_barcode, site_reference, location_type, item_type_group, item_barcode)
        VALUES ${values.join(',')}`,
       params,
     );
