@@ -54,23 +54,29 @@ export function SignInSheet({ open, onClose }: Props) {
           onClick={(e) => e.stopPropagation()}
           className="relative w-full max-w-md overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 sm:rounded-2xl"
         >
-          <header className="flex items-center justify-between gap-3 border-b border-line bg-surface-2/40 px-5 py-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <header className="flex flex-col items-center gap-3 border-b border-line bg-brand-grad px-5 py-6">
+            <img
+              src="/ryderwear-logo.png"
+              alt="Ryderwear"
+              className="h-20 w-auto object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.4)]"
+              draggable={false}
+            />
+            <div className="text-center">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
                 {mode === 'signin' ? 'Welcome back' : 'Get started'}
               </div>
-              <h2 id="signin-heading" className="text-base font-semibold text-ink">
+              <h2 id="signin-heading" className="text-base font-semibold text-white">
                 {mode === 'signin' ? 'Sign in' : 'Create account'}
               </h2>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </header>
 
           <form className="space-y-3 p-5" onSubmit={handleSubmit}>
