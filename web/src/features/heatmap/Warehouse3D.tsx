@@ -131,7 +131,10 @@ export function Warehouse3D({ onClose }: Props) {
   const navigate = useNavigate()
   const [selected, setSelected] = useState<BayBlock | null>(null)
   const [hideEmpty, setHideEmpty] = useState(false)
-  const controlsRef = useRef<{ reset: () => void } | null>(null)
+  // Bumping this key remounts the Canvas + camera + controls from scratch.
+  // Cheaper than fighting OrbitControls' internal saved-state, and always
+  // recovers if the user drifts the camera off the warehouse.
+  const [resetKey, setResetKey] = useState(0)
 
   const blocks = useMemo(() => (inv ? aggregateBayLevels(allSlots(inv)) : []), [inv])
   const positions = useMemo(() => layoutBayLevels(blocks), [blocks])
@@ -219,8 +222,12 @@ export function Warehouse3D({ onClose }: Props) {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-line bg-bg/80">
+    <div
+      className="relative h-full w-full overflow-hidden rounded-2xl border border-line bg-bg/80"
+      style={{ touchAction: 'none' }}
+    >
       <Canvas
+        key={resetKey}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: false, preserveDrawingBuffer: false }}
         style={{ background: 'radial-gradient(ellipse at center, #11203a 0%, #050a14 70%)' }}
@@ -228,18 +235,20 @@ export function Warehouse3D({ onClose }: Props) {
         <color attach="background" args={['#0a1428']} />
         <SceneCamera centre={bounds.centre} size={bounds.size} zoom={initialZoom} />
         <OrbitControls
-          ref={controlsRef as never}
           enablePan
           enableRotate
           enableZoom
-          zoomToCursor
-          zoomSpeed={1.4}
-          // No upper zoom cap — two-finger pinch should go as deep as
-          // the user wants (down to a single slot if needed). minZoom
-          // stays scaled to the initial framing so a hard pinch-out
-          // doesn't lose the warehouse off-screen.
-          minZoom={initialZoom * 0.25}
-          maxZoom={Infinity}
+          // zoomToCursor was drifting the target off-scene over multiple
+          // pinches — the scene would slide into a corner and you couldn't
+          // find it again. Centre-of-screen zoom is less natural but
+          // predictable, and the Reset button is right there for recovery.
+          zoomSpeed={1.2}
+          // Cap maxZoom at a deep-but-bounded multiple of the initial
+          // framing — Infinity let users pinch into nothingness and not
+          // know how to get back. 100× gets you down to a few centimetres
+          // of warehouse on a phone, plenty for slot-level inspection.
+          minZoom={initialZoom * 0.3}
+          maxZoom={initialZoom * 100}
           target={bounds.centre}
           dampingFactor={0.12}
         />
@@ -290,11 +299,7 @@ export function Warehouse3D({ onClose }: Props) {
             />
             <CanvasButton
               title="Reset camera"
-              onClick={() => {
-                if (controlsRef.current && typeof controlsRef.current.reset === 'function') {
-                  controlsRef.current.reset()
-                }
-              }}
+              onClick={() => setResetKey((k) => k + 1)}
               icon={<RotateCcw className="h-4 w-4" />}
             />
             {onClose && (
