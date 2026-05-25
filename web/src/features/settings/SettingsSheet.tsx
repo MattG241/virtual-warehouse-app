@@ -1,7 +1,12 @@
 import { createPortal } from 'react-dom'
-import { Check, Moon, Palette, Sun, X, GripVertical, Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  Check, Moon, Palette, Sun, X, GripVertical, Eye, EyeOff, RotateCcw,
+  LayoutGrid, ChevronRight, LogIn, LogOut, User as UserIcon,
+} from 'lucide-react'
 import { useTheme, type Accent } from '@/store/theme'
 import { useDashboard, defaultWidgets, type WidgetKey } from '@/features/dashboard/store'
+import { useAuth } from '@/features/auth/store'
 import { cn } from '@/lib/cn'
 
 const ACCENTS: { key: Accent; label: string; swatch: string }[] = [
@@ -27,6 +32,9 @@ export function SettingsSheet({ open, onClose }: Props) {
   const toggle = useDashboard((s) => s.toggle)
   const move = useDashboard((s) => s.move)
   const reset = useDashboard((s) => s.reset)
+
+  const user = useAuth((s) => s.user)
+  const signOut = useAuth((s) => s.signOut)
 
   if (!open) return null
 
@@ -176,6 +184,70 @@ export function SettingsSheet({ open, onClose }: Props) {
               Drag-ordered with the arrow buttons. Eye toggle hides a card from the
               Command Centre. Saved per-device.
             </p>
+          </section>
+
+          {/* Workspace links — mobile users have no sidebar, so these
+              destinations need to live somewhere reachable from the gear. */}
+          <section>
+            <SectionTitle label="Workspace" />
+            <Link
+              to="/settings/layout"
+              onClick={onClose}
+              className="group flex items-center gap-3 rounded-lg border border-line bg-surface-2/40 p-3 transition hover:border-brand-ring/40 hover:bg-surface-2"
+            >
+              <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-good/15 text-good">
+                <LayoutGrid className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">Warehouse layout</div>
+                <div className="text-[11px] text-muted">
+                  Add or remove aisles and adjust bay counts. Sign-in required.
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-subtle transition group-hover:translate-x-1 group-hover:text-ink" />
+            </Link>
+          </section>
+
+          {/* Account — sign-in / sign-out lives here too so mobile users
+              can manage their session without a separate page. */}
+          <section>
+            <SectionTitle label="Account" />
+            {user ? (
+              <div className="flex items-center gap-3 rounded-lg border border-line bg-surface-2/40 p-3">
+                <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-brand/15 font-mono text-[10px] font-bold uppercase text-brand">
+                  {user.email.slice(0, 2)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted">
+                    Signed in as
+                  </div>
+                  <div className="truncate text-sm font-semibold text-ink">
+                    {user.email}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await signOut()
+                  }}
+                  aria-label="Sign out"
+                  className="grid h-9 w-9 place-items-center rounded-md text-muted hover:bg-bad/15 hover:text-bad"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg border border-line bg-surface-2/40 p-3 text-sm text-muted">
+                <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-subtle/15 text-subtle">
+                  <UserIcon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  Not signed in. Use the <strong className="text-ink">Sign in</strong> button
+                  in the topbar.
+                </span>
+                <LogIn className="h-4 w-4 flex-shrink-0 text-subtle" />
+              </div>
+            )}
           </section>
         </div>
       </aside>

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { useInventory } from '@/features/inventory/store'
@@ -15,6 +15,7 @@ import { cn } from '@/lib/cn'
  *  (or full-screen sheet on mobile). */
 export function AisleView() {
   const { aisleId = '' } = useParams<{ aisleId: string }>()
+  const [params, setParams] = useSearchParams()
   const inv = useInventory((s) => s.inventory)
   const navigate = useNavigate()
 
@@ -24,12 +25,50 @@ export function AisleView() {
   )
   const [selected, setSelected] = useState<SlotSummary | null>(null)
   const [activeBay, setActiveBay] = useState<string>(bays[0]?.bay || '')
+  const targetSlot = params.get('slot')
 
   // Reset selection when navigating between aisles
   useEffect(() => {
     setSelected(null)
     setActiveBay(bays[0]?.bay || '')
   }, [aisleId, bays])
+
+  // Search-overlay deep-link: ?slot=A01.B05.L02.S3 → focus the bay + open
+  // the inspector for that exact slot. Runs once per change of `slot`.
+  const handledSlotRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!targetSlot || bays.length === 0) return
+    if (handledSlotRef.current === targetSlot) return
+    handledSlotRef.current = targetSlot
+
+    // Find the slot inside the aisle's bays
+    for (const b of bays) {
+      for (const lv of b.levels) {
+        const hit = lv.slots.find((s) => s.code === targetSlot)
+        if (hit) {
+          setActiveBay(b.bay)
+          setSelected(hit)
+          // Scroll the bay into view once the rack is rendered
+          requestAnimationFrame(() => {
+            document
+              .querySelector(`[data-bay="${b.bay}"]`)
+              ?.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' })
+            // Then scroll the specific box into view
+            requestAnimationFrame(() => {
+              document
+                .querySelector(`[data-code="${targetSlot}"]`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            })
+          })
+          // Strip the ?slot= from the URL so reload doesn't re-trigger
+          const next = new URLSearchParams(params)
+          next.delete('slot')
+          setParams(next, { replace: true })
+          return
+        }
+      }
+    }
+  }, [targetSlot, bays, params, setParams])
 
   if (!inv) return null
   if (!bays.length) {
