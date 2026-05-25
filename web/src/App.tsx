@@ -9,6 +9,7 @@ import { Reports } from '@/routes/Reports'
 import { Inventory } from '@/routes/Inventory'
 import { Alerts } from '@/routes/Alerts'
 import { Replenish } from '@/routes/Replenish'
+import { Pick } from '@/routes/Pick'
 import { Settings } from '@/routes/Settings'
 import { LayoutEditor } from '@/routes/LayoutEditor'
 import { NotFound } from '@/routes/NotFound'
@@ -99,6 +100,14 @@ export default function App() {
           element={
             <AppShell title="Replenishment">
               <Replenish />
+            </AppShell>
+          }
+        />
+        <Route
+          path="/pick"
+          element={
+            <AppShell title="Pick route">
+              <Pick />
             </AppShell>
           }
         />
