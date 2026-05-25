@@ -393,6 +393,110 @@ select:focus,
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.14);
 }
 
+/* Dashboard KPI cards */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow var(--t-fast);
+}
+
+.kpi-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.kpi-card--primary {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
+  color: #ffffff;
+  border-color: var(--brand-strong);
+}
+
+.kpi-card--warn {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.kpi-card--alert {
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+.kpi-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kpi-card--primary .kpi-card__label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.kpi-card__value {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.kpi-card--primary .kpi-card__value {
+  color: #ffffff;
+}
+
+.kpi-card--warn .kpi-card__value {
+  color: var(--amber);
+}
+
+.kpi-card--alert .kpi-card__value {
+  color: var(--red);
+}
+
+.kpi-card__unit {
+  font-size: 18px;
+  font-weight: 600;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+.kpi-card__sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.kpi-card--primary .kpi-card__sub {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.kpi-card__bar {
+  margin-top: 6px;
+  height: 6px;
+  background: var(--panel-sunken);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.kpi-card__bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--brand-strong) 100%);
+  border-radius: 999px;
+  transition: width var(--t-base);
+}
+
 /* Auth chip + sign-in modal */
 .auth-chip {
   position: relative;
@@ -1097,7 +1201,7 @@ body.is-signed-out #layoutView .section-heading::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 500;
@@ -1112,6 +1216,73 @@ body.is-signed-out #layoutView .section-heading::after {
 
 .search-active-chip[hidden] {
   display: none !important;
+}
+
+.search-active-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.search-active-label strong {
+  font-weight: 600;
+}
+
+.search-active-pos {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-strong);
+  background: rgba(37, 99, 235, 0.10);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.search-active-pos strong {
+  color: var(--brand-strong);
+  font-weight: 700;
+}
+
+.search-active-qty {
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+  background: rgba(22, 163, 74, 0.10);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.search-active-code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted-strong);
+}
+
+.search-active-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.search-active-nav {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--brand-ring);
+  border-radius: var(--r-xs);
+  color: var(--brand-strong);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.search-active-nav:hover {
+  background: rgba(37, 99, 235, 0.18);
 }
 
 .search-active-chip strong {
@@ -1155,11 +1326,22 @@ body.is-signed-out #layoutView .section-heading::after {
   box-shadow: 0 0 0 4px var(--brand-ring);
   position: relative;
   z-index: 2;
-  animation: search-hit-flash 1.4s ease-out 1;
 }
 
-@keyframes search-hit-flash {
-  0% { transform: scale(1.06); }
+/* The slot we're currently focused on (when paging through multiple
+   locations of the same SKU) gets a stronger ring + pulse so it stands
+   out from its sibling hits. */
+.search-hit--current {
+  outline-color: var(--brand-strong);
+  box-shadow:
+    0 0 0 4px var(--brand-ring),
+    0 0 24px rgba(37, 99, 235, 0.45);
+  z-index: 3;
+  animation: search-current-pulse 1.4s ease-out 2;
+}
+
+@keyframes search-current-pulse {
+  0% { transform: scale(1.08); }
   100% { transform: scale(1); }
 }
 

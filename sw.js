@@ -1,7 +1,7 @@
 // Minimal service worker: cache the app shell so the visualiser still renders
 // when offline (showing the last fetched layout, no live API). API calls
 // always go to the network — we never want to serve stale stock data.
-const CACHE_NAME = 'vw-shell-v1';
+const CACHE_NAME = 'vw-shell-v2';
 const SHELL = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const SHELL = [
   './live-updates.js',
   './auth-ui.js',
   './scanner-ui.js',
+  './export-ui.js',
+  './dashboard-kpis.js',
   './inventory.js',
   './icon.svg',
   './manifest.webmanifest',

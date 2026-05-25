@@ -118,6 +118,24 @@
   chip.addEventListener('click', (e) => {
     if (e.target.closest('.search-active-clear')) {
       clearHighlight();
+    } else if (e.target.closest('[data-nav="prev"]')) {
+      advance(-1);
+    } else if (e.target.closest('[data-nav="next"]')) {
+      advance(1);
+    }
+  });
+
+  // Global keyboard shortcuts when a multi-location search is active
+  document.addEventListener('keydown', (e) => {
+    if (!activeNav || activeNav.locations.length <= 1) return;
+    // Don't hijack typing into the search input or other fields
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === ']' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      advance(1);
+    } else if (e.key === '[' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      advance(-1);
     }
   });
 
@@ -204,6 +222,7 @@
 
   // --- Highlight + jump -----------------------------------------------------
   let highlightClearId = null;
+  let activeNav = null; // { sku, label, locations: [{code, qty}], idx }
 
   function pickSku(sku) {
     const idx = ensureIndex();
@@ -212,24 +231,42 @@
       hidePanel();
       return;
     }
-    setActiveChip(sku, locs.length);
+    // Sort by aisle/bay for a stable walk order
+    const sortedLocs = locs.slice().sort((a, b) => locationSortKey(a.code).localeCompare(locationSortKey(b.code)));
+    activeNav = { sku, label: sku, locations: sortedLocs, idx: 0 };
     document.body.dataset.searchSku = sku;
     document.body.classList.add('has-search-highlight');
-    applyBoxHighlight(locs.map((l) => l.code));
-    jumpToCode(locs[0].code);
+    applyBoxHighlight(sortedLocs.map((l) => l.code));
+    setActiveChip();
+    jumpToCode(sortedLocs[0].code);
     hidePanel();
     input.value = sku;
     scheduleClear();
   }
 
   function pickLocation(code) {
+    activeNav = { sku: null, label: code, locations: [{ code, qty: null }], idx: 0 };
     document.body.classList.add('has-search-highlight');
     applyBoxHighlight([code]);
-    setActiveChip(code, 1);
+    setActiveChip();
     jumpToCode(code);
     hidePanel();
     input.value = code;
     scheduleClear();
+  }
+
+  function advance(direction) {
+    if (!activeNav || activeNav.locations.length <= 1) return;
+    const len = activeNav.locations.length;
+    activeNav.idx = (activeNav.idx + direction + len) % len;
+    setActiveChip();
+    jumpToCode(activeNav.locations[activeNav.idx].code);
+    scheduleClear(); // refresh the auto-clear timer
+  }
+
+  function locationSortKey(code) {
+    // Padded numbers so sort treats A2 < A10 etc.
+    return code.replace(/\d+/g, (n) => n.padStart(5, '0'));
   }
 
   function scheduleClear() {
@@ -242,14 +279,19 @@
     document.body.classList.remove('has-search-highlight');
     delete document.body.dataset.searchSku;
     document
-      .querySelectorAll('.search-hit')
-      .forEach((el) => el.classList.remove('search-hit'));
+      .querySelectorAll('.search-hit, .search-hit--current')
+      .forEach((el) => el.classList.remove('search-hit', 'search-hit--current'));
     chip.hidden = true;
     input.value = '';
+    activeNav = null;
+    window.__searchHighlightCodes = null;
+    window.__searchCurrentCode = null;
   }
 
   function applyBoxHighlight(codes) {
-    document.querySelectorAll('.search-hit').forEach((el) => el.classList.remove('search-hit'));
+    document
+      .querySelectorAll('.search-hit, .search-hit--current')
+      .forEach((el) => el.classList.remove('search-hit', 'search-hit--current'));
     const set = new Set(codes);
     document.querySelectorAll('[data-code]').forEach((el) => {
       if (set.has(el.dataset.code)) el.classList.add('search-hit');
@@ -259,11 +301,17 @@
       window.__searchHighlightObserverInstalled = true;
       const obs = new MutationObserver(() => {
         if (!document.body.classList.contains('has-search-highlight')) return;
-        const codes = window.__searchHighlightCodes;
-        if (!codes) return;
-        const set2 = new Set(codes);
+        const allCodes = window.__searchHighlightCodes;
+        const currentCode = window.__searchCurrentCode;
+        if (!allCodes) return;
+        const hitSet = new Set(allCodes);
         document.querySelectorAll('[data-code]').forEach((el) => {
-          if (set2.has(el.dataset.code)) el.classList.add('search-hit');
+          if (hitSet.has(el.dataset.code)) {
+            el.classList.add('search-hit');
+            if (currentCode && el.dataset.code === currentCode) {
+              el.classList.add('search-hit--current');
+            }
+          }
         });
       });
       const target = document.querySelector('.main-panel') || document.body;
@@ -316,7 +364,8 @@
         tryClick(`#warehouse3d [data-bay-id="${cssEscape(bayId)}"]`);
 
         setTimeout(() => {
-          // 5. Slot → final selection + scroll into view
+          // 5. Slot → final selection + scroll into view, mark as "current"
+          markCurrent(code);
           const target = document.querySelector(`[data-code="${cssEscape(code)}"]`);
           if (target) {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -331,12 +380,50 @@
     }, 220);
   }
 
-  function setActiveChip(label, locCount) {
+  function markCurrent(code) {
+    window.__searchCurrentCode = code;
+    document
+      .querySelectorAll('.search-hit--current')
+      .forEach((el) => el.classList.remove('search-hit--current'));
+    document.querySelectorAll(`[data-code="${cssEscape(code)}"]`).forEach((el) => {
+      el.classList.add('search-hit', 'search-hit--current');
+    });
+  }
+
+  function setActiveChip() {
+    if (!activeNav) {
+      chip.hidden = true;
+      return;
+    }
+    const { label, locations, idx } = activeNav;
+    const count = locations.length;
+    const current = locations[idx];
+    const positionInfo =
+      count > 1
+        ? `<span class="search-active-pos"><strong>${idx + 1}</strong> of <strong>${count}</strong></span>`
+        : '';
+    const qtyChip =
+      current && current.qty != null
+        ? `<span class="search-active-qty">${current.qty} units</span>`
+        : '';
+    const navBtns =
+      count > 1
+        ? `
+          <button type="button" class="search-active-nav" data-nav="prev" aria-label="Previous location">↑</button>
+          <button type="button" class="search-active-nav" data-nav="next" aria-label="Next location">↓</button>
+        `
+        : '';
     chip.innerHTML = `
-      <span class="search-active-label">Showing: <strong>${escapeHtml(label)}</strong>${
-        locCount > 1 ? ` <em>(${locCount} locations)</em>` : ''
-      }</span>
-      <button type="button" class="search-active-clear" aria-label="Clear">×</button>
+      <div class="search-active-info">
+        <span class="search-active-label"><strong>${escapeHtml(label)}</strong></span>
+        ${positionInfo}
+        ${qtyChip}
+        <span class="search-active-code">${escapeHtml(current ? current.code : '')}</span>
+      </div>
+      <div class="search-active-actions">
+        ${navBtns}
+        <button type="button" class="search-active-clear" aria-label="Clear highlight">×</button>
+      </div>
     `;
     chip.hidden = false;
   }
