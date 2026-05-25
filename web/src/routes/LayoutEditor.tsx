@@ -188,52 +188,85 @@ export function LayoutEditor() {
             {aisles.map((a, idx) => (
               <li
                 key={`${a.id}-${idx}`}
-                className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-lg border border-line bg-surface-2/40 p-3 sm:grid-cols-[auto_1fr_1fr_auto_auto]"
+                className="rounded-lg border border-line bg-surface-2/40 p-3"
               >
-                <span className="grid h-10 w-12 place-items-center rounded-md bg-brand/15 font-mono text-sm font-bold text-brand">
-                  {a.id}
-                </span>
-                <input
-                  value={a.name}
-                  onChange={(e) => patchAisle(idx, { name: e.target.value })}
-                  placeholder="Name (optional)"
-                  className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-ring focus:outline-none focus:ring-2 focus:ring-brand-ring/30"
-                />
-                <input
-                  value={a.zone}
-                  onChange={(e) => patchAisle(idx, { zone: e.target.value })}
-                  placeholder="Zone"
-                  className="hidden h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-ring focus:outline-none focus:ring-2 focus:ring-brand-ring/30 sm:block"
-                />
-                <div className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-1.5 py-1">
-                  <button
-                    type="button"
-                    onClick={() => bumpBays(idx, -1)}
-                    aria-label="Fewer bays"
-                    className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="tnum min-w-[2.5rem] text-center text-sm font-bold text-ink">
-                    {a.bayCount}
+                {/* Mobile: stack — header row with badge + name + delete,
+                    then a "bays" row with stepper + label. Desktop:
+                    single row with badge + name + zone + stepper + delete. */}
+                <div className="flex items-center gap-3 sm:grid sm:grid-cols-[auto_1fr_1fr_auto_auto]">
+                  <span className="grid h-10 w-12 flex-shrink-0 place-items-center rounded-md bg-brand/15 font-mono text-sm font-bold text-brand">
+                    {a.id}
                   </span>
+                  <input
+                    value={a.name}
+                    onChange={(e) => patchAisle(idx, { name: e.target.value })}
+                    placeholder="Name (optional)"
+                    className="h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-ring focus:outline-none focus:ring-2 focus:ring-brand-ring/30"
+                  />
+                  <input
+                    value={a.zone}
+                    onChange={(e) => patchAisle(idx, { zone: e.target.value })}
+                    placeholder="Zone"
+                    className="hidden h-10 min-w-0 rounded-md border border-line bg-surface px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-ring focus:outline-none focus:ring-2 focus:ring-brand-ring/30 sm:block"
+                  />
+                  {/* Bay stepper — second row on mobile, inline on desktop */}
+                  <div className="hidden sm:flex items-center gap-1.5 rounded-md border border-line bg-surface px-1.5 py-1">
+                    <button
+                      type="button"
+                      onClick={() => bumpBays(idx, -1)}
+                      aria-label="Fewer bays"
+                      className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="tnum min-w-[2.5rem] text-center text-sm font-bold text-ink">
+                      {a.bayCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => bumpBays(idx, 1)}
+                      aria-label="More bays"
+                      className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => bumpBays(idx, 1)}
-                    aria-label="More bays"
-                    className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
+                    onClick={() => removeAisle(idx)}
+                    aria-label={`Remove ${a.id}`}
+                    className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md text-bad hover:bg-bad/15"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeAisle(idx)}
-                  aria-label={`Remove ${a.id}`}
-                  className="grid h-9 w-9 place-items-center rounded-md text-bad hover:bg-bad/15"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {/* Mobile-only bay stepper row */}
+                <div className="mt-2 flex items-center justify-between gap-3 sm:hidden">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Bays
+                  </span>
+                  <div className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-1.5 py-1">
+                    <button
+                      type="button"
+                      onClick={() => bumpBays(idx, -1)}
+                      aria-label="Fewer bays"
+                      className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="tnum min-w-[2.5rem] text-center text-sm font-bold text-ink">
+                      {a.bayCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => bumpBays(idx, 1)}
+                      aria-label="More bays"
+                      className="grid h-7 w-7 place-items-center rounded text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
             <li>
