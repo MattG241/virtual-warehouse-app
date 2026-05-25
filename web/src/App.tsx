@@ -9,9 +9,12 @@ import { Reports } from '@/routes/Reports'
 import { Inventory } from '@/routes/Inventory'
 import { Alerts } from '@/routes/Alerts'
 import { Replenish } from '@/routes/Replenish'
-import { Placeholder } from '@/routes/Placeholder'
+import { Settings } from '@/routes/Settings'
+import { LayoutEditor } from '@/routes/LayoutEditor'
+import { NotFound } from '@/routes/NotFound'
 import { applyTheme, useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
+import { useAuth } from '@/features/auth/store'
 import { openEvents } from '@/lib/api'
 
 function ThemeBridge() {
@@ -36,11 +39,20 @@ function InventoryBridge() {
   return null
 }
 
+function AuthBridge() {
+  const refresh = useAuth((s) => s.refresh)
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <ThemeBridge />
       <InventoryBridge />
+      <AuthBridge />
       <Routes>
         <Route
           path="/"
@@ -110,7 +122,15 @@ export default function App() {
           path="/settings"
           element={
             <AppShell title="Settings">
-              <Placeholder title="Settings" body="Theme accent, dashboard widgets, and account." />
+              <Settings />
+            </AppShell>
+          }
+        />
+        <Route
+          path="/settings/layout"
+          element={
+            <AppShell title="Layout editor">
+              <LayoutEditor />
             </AppShell>
           }
         />
@@ -118,7 +138,7 @@ export default function App() {
           path="*"
           element={
             <AppShell title="Not found">
-              <Placeholder title="Not found" body="That page doesn't exist." />
+              <NotFound />
             </AppShell>
           }
         />

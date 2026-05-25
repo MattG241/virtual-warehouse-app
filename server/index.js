@@ -199,9 +199,9 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
   }
 });
 
-// Serve the React build from web/dist in production. The build hashes asset
-// filenames, so we can cache aggressively except for index.html (no-cache so
-// new deploys roll out immediately).
+// Serve the React build from web/dist. Asset filenames are content-hashed by
+// Vite so we can cache aggressively; index.html stays no-cache so deploys
+// roll out immediately.
 import fs from 'node:fs';
 const webDist = path.join(projectRoot, 'web', 'dist');
 const hasWebBuild = fs.existsSync(path.join(webDist, 'index.html'));
@@ -214,7 +214,6 @@ if (hasWebBuild) {
         if (filePath.endsWith('index.html')) {
           res.setHeader('Cache-Control', 'no-cache');
         } else if (/\.(?:js|css|woff2?|png|svg|jpg|jpeg|webp|ico)$/.test(filePath)) {
-          // Hashed asset filenames — safe to cache for a year
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       },
@@ -227,20 +226,17 @@ if (hasWebBuild) {
     res.sendFile(path.join(webDist, 'index.html'));
   });
 } else {
-  // Dev / unbuilt: fall back to the legacy static SPA at the repo root.
-  console.warn(
-    '[server] web/dist not found — serving legacy static SPA. Run `npm run build` in /web to use the React UI.',
+  // The frontend hasn't been built. Tell the user clearly instead of
+  // silently 404ing every page request.
+  console.error(
+    '[server] web/dist not found. Run `npm --prefix web ci && npm --prefix web run build` first.',
   );
-  app.use(
-    express.static(projectRoot, {
-      extensions: ['html'],
-      setHeaders(res, filePath) {
-        if (filePath.endsWith('.html') || filePath.endsWith('bootstrap.js')) {
-          res.setHeader('Cache-Control', 'no-cache');
-        }
-      },
-    }),
-  );
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res
+      .status(503)
+      .type('text/plain')
+      .send('Frontend not built. Run: npm --prefix web ci && npm --prefix web run build');
+  });
 }
 
 let httpServer;

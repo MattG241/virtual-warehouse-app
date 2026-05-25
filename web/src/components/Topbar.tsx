@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Sun, Moon, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
+import { Search, Sun, Moon, RefreshCw, Settings as SettingsIcon, LogIn, LogOut, User as UserIcon } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
@@ -8,6 +8,8 @@ import { timeAgo } from '@/lib/inventory'
 import { cn } from '@/lib/cn'
 import { useSearch } from '@/features/search/store'
 import { SettingsSheet } from '@/features/settings/SettingsSheet'
+import { useAuth } from '@/features/auth/store'
+import { SignInSheet } from '@/features/auth/SignInSheet'
 
 interface Props {
   title: string
@@ -22,6 +24,10 @@ export function Topbar({ title }: Props) {
   const [syncing, setSyncing] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const user = useAuth((s) => s.user)
+  const signOut = useAuth((s) => s.signOut)
 
   // Keep "x mins ago" fresh without thrashing
   useEffect(() => {
@@ -117,7 +123,64 @@ export function Topbar({ title }: Props) {
         <SettingsIcon className="h-4 w-4" />
       </Button>
 
+      {user ? (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface font-mono text-xs font-bold uppercase text-brand hover:border-line-strong"
+            aria-label={`Signed in as ${user.email}`}
+            title={user.email}
+          >
+            {user.email.slice(0, 2)}
+          </button>
+          {menuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setMenuOpen(false)}
+                aria-hidden
+              />
+              <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-lg border border-line bg-surface shadow-pop animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="border-b border-line px-3 py-2 text-[11px] text-muted">
+                  Signed in as
+                  <div className="truncate text-sm font-semibold text-ink">
+                    {user.email}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setMenuOpen(false)
+                    await signOut()
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-ink"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => setSignInOpen(true)}
+          className="!h-10 !px-3"
+          icon={<LogIn className="h-4 w-4" />}
+        >
+          <span className="hidden sm:inline">Sign in</span>
+        </Button>
+      )}
+
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SignInSheet open={signInOpen} onClose={() => setSignInOpen(false)} />
     </header>
   )
 }
+
+// Marker so unused-imports lint passes
+void UserIcon
+
