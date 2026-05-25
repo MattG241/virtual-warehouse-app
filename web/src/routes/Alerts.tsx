@@ -28,16 +28,18 @@ export function Alerts() {
   const skus = useMemo(() => (inv ? perSku(inv) : []), [inv])
   const aisles = useMemo(() => (inv ? perAisle(inv) : []), [inv])
 
+  // Compute UNCAPPED filters so the summary counts are honest. The
+  // render slices these to a sensible cap right before mapping into JSX.
   const criticalSkus = useMemo(
-    () => skus.filter((s) => s.status === 'critical').slice(0, 100),
+    () => skus.filter((s) => s.status === 'critical'),
     [skus],
   )
   const lowSkus = useMemo(
-    () => skus.filter((s) => s.status === 'low').slice(0, 100),
+    () => skus.filter((s) => s.status === 'low'),
     [skus],
   )
   const zeroSkus = useMemo(
-    () => skus.filter((s) => s.status === 'empty').slice(0, 100),
+    () => skus.filter((s) => s.status === 'empty'),
     [skus],
   )
   const lowAisles = useMemo(
@@ -58,6 +60,10 @@ export function Alerts() {
   }
   const total =
     counts.critical + counts.low + counts.zero + counts.aisle + counts.sync
+
+  // How many to actually render in each card body — capped purely for
+  // perf, not for counting.
+  const LIST_CAP = 100
 
   if (!inv) return null
 
@@ -130,7 +136,7 @@ export function Alerts() {
           />
           <CardBody className="!p-0">
             <ul className="divide-y divide-line">
-              {criticalSkus.map((s) => (
+              {criticalSkus.slice(0, LIST_CAP).map((s) => (
                 <li key={s.sku}>
                   <button
                     type="button"
@@ -153,6 +159,9 @@ export function Alerts() {
                 </li>
               ))}
             </ul>
+            {counts.critical > LIST_CAP && (
+              <ListMoreFooter shown={LIST_CAP} total={counts.critical} />
+            )}
           </CardBody>
         </Card>
       )}
@@ -165,7 +174,7 @@ export function Alerts() {
           />
           <CardBody className="!p-0">
             <ul className="divide-y divide-line">
-              {lowSkus.map((s) => (
+              {lowSkus.slice(0, LIST_CAP).map((s) => (
                 <li key={s.sku}>
                   <button
                     type="button"
@@ -188,6 +197,9 @@ export function Alerts() {
                 </li>
               ))}
             </ul>
+            {counts.low > LIST_CAP && (
+              <ListMoreFooter shown={LIST_CAP} total={counts.low} />
+            )}
           </CardBody>
         </Card>
       )}
@@ -200,7 +212,7 @@ export function Alerts() {
           />
           <CardBody className="!p-0">
             <ul className="divide-y divide-line">
-              {zeroSkus.slice(0, tab === 'zero' ? 100 : 8).map((s) => (
+              {zeroSkus.slice(0, tab === 'zero' ? LIST_CAP : 8).map((s) => (
                 <li key={s.sku}>
                   <button
                     type="button"
@@ -219,10 +231,13 @@ export function Alerts() {
                 </li>
               ))}
             </ul>
-            {tab === 'all' && zeroSkus.length > 8 && (
+            {tab === 'all' && counts.zero > 8 && (
               <div className="border-t border-line bg-surface-2/40 px-5 py-2 text-center text-[11px] text-muted">
-                +{zeroSkus.length - 8} more · tap “Zero stock” tab to see all
+                +{counts.zero - 8} more · tap “Zero stock” tab to see all
               </div>
+            )}
+            {tab === 'zero' && counts.zero > LIST_CAP && (
+              <ListMoreFooter shown={LIST_CAP} total={counts.zero} />
             )}
           </CardBody>
         </Card>
@@ -292,6 +307,14 @@ export function Alerts() {
           </CardBody>
         </Card>
       )}
+    </div>
+  )
+}
+
+function ListMoreFooter({ shown, total }: { shown: number; total: number }) {
+  return (
+    <div className="border-t border-line bg-surface-2/40 px-5 py-2 text-center text-[11px] text-muted">
+      Showing first {shown} of {fmtN(total)} · refine the filter to narrow down
     </div>
   )
 }
