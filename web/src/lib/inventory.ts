@@ -147,9 +147,21 @@ export interface SkuSummary {
 }
 
 /** Per-SKU rollup across every grid location + other-locations. Sorted by
- *  units descending so the busiest items lead. */
+ *  units descending so the busiest items lead.
+ *
+ *  Includes every known SKU (from inv.skus), even ones with zero stock
+ *  everywhere — so true zero-stock SKUs surface correctly in alerts and
+ *  inventory filters. Without this, a SKU that has nothing in grid/other
+ *  silently disappeared.
+ */
 export function perSku(inv: Inventory): SkuSummary[] {
   const map = new Map<string, { units: number; locs: Set<string> }>()
+
+  // Seed every known SKU so zero-stock items aren't dropped
+  for (const sku of Object.keys(inv.skus)) {
+    map.set(sku, { units: 0, locs: new Set() })
+  }
+
   for (const [code, entries] of Object.entries(inv.grid)) {
     for (const [sku, qty] of entries) {
       const n = Number(qty) || 0
