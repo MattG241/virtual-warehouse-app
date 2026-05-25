@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
-import { CommandCentre } from '@/routes/CommandCentre'
-import { Warehouse } from '@/routes/Warehouse'
+import { CommandCentreSwitch } from '@/routes/CommandCentreSwitch'
+import { WarehouseSwitch } from '@/routes/WarehouseSwitch'
 import { AisleView } from '@/routes/AisleView'
 import { Scan } from '@/routes/Scan'
 import { Reports } from '@/routes/Reports'
-import { Inventory } from '@/routes/Inventory'
+import { InventorySwitch } from '@/routes/InventorySwitch'
 import { Alerts } from '@/routes/Alerts'
 import { Replenish } from '@/routes/Replenish'
 import { Pick } from '@/routes/Pick'
@@ -64,7 +64,7 @@ export default function App() {
           path="/"
           element={
             <AppShell title="Command Centre">
-              <CommandCentre />
+              <CommandCentreSwitch />
             </AppShell>
           }
         />
@@ -72,7 +72,7 @@ export default function App() {
           path="/warehouse"
           element={
             <AppShell title="Warehouse">
-              <Warehouse />
+              <WarehouseSwitch />
             </AppShell>
           }
         />
@@ -88,7 +88,7 @@ export default function App() {
           path="/inventory"
           element={
             <AppShell title="Inventory">
-              <Inventory />
+              <InventorySwitch />
             </AppShell>
           }
         />
