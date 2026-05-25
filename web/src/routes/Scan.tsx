@@ -83,7 +83,16 @@ export function Scan() {
       if (rec.kind === 'sku') {
         navigate(`/inventory?q=${encodeURIComponent(rec.resolved)}`)
       } else if (rec.kind === 'location') {
-        navigate(`/warehouse?loc=${encodeURIComponent(rec.resolved)}`)
+        // Parse the location code "A01.B05.L02.S3" and drill into the
+        // aisle walkthrough with the slot pre-selected, matching the
+        // search-overlay behaviour.
+        const aisleMatch = /^(A\d+)/.exec(rec.resolved)
+        const aisleId = aisleMatch?.[1]
+        if (aisleId) {
+          navigate(`/warehouse/${aisleId}?slot=${encodeURIComponent(rec.resolved)}`)
+        } else {
+          navigate('/warehouse')
+        }
       }
     },
     [navigate, resolve],

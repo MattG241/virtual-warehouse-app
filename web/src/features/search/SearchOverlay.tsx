@@ -135,7 +135,9 @@ export function SearchOverlay() {
       if (aisleId) {
         navigate(`/warehouse/${aisleId}?slot=${encodeURIComponent(hit.code)}`)
       } else {
-        navigate(`/warehouse?loc=${encodeURIComponent(hit.code)}`)
+        // Non-standard location code (e.g. an "other" overflow location).
+        // Drop them on the warehouse list rather than the dead ?loc= URL.
+        navigate('/warehouse')
       }
     }
     close()
