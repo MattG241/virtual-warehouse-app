@@ -4,9 +4,17 @@ import type { Inventory, KpiSummary, SlotSummary, Status } from './types'
 
 const CODE_RE = /^A(\d+)\.B(\d+)\.L(\d+)\.S(\d+)$/i
 
+// Thresholds drive the four box-state colours in the rack visualisation:
+// blue (empty) → red (critical) → orange (low) → green (healthy).
+// Tuned so a "critical" call is unmistakable and a "low" call still has
+// enough buffer to action overnight rather than urgently.
+export const CRITICAL_THRESHOLD = 2
+export const LOW_THRESHOLD = 5
+
 export function statusFor(qty: number): Status {
   if (qty <= 0) return 'empty'
-  if (qty <= 5) return 'low'
+  if (qty <= CRITICAL_THRESHOLD) return 'critical'
+  if (qty <= LOW_THRESHOLD) return 'low'
   return 'healthy'
 }
 

@@ -26,7 +26,7 @@ export function Warehouse() {
     <Card>
       <CardHeader eyebrow="Walk the floor" title="Aisles" />
       <CardBody>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {aisles.map((a) => {
             const pct = a.total ? Math.round((a.stocked / a.total) * 100) : 0
             const tone =

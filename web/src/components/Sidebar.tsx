@@ -7,6 +7,7 @@ import {
   Settings,
   ScanLine,
   Bell,
+  ArrowDownToLine,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -21,6 +22,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Command Centre', icon: LayoutGrid },
   { to: '/warehouse', label: 'Warehouse', icon: Boxes },
   { to: '/inventory', label: 'Inventory', icon: PackageSearch },
+  { to: '/replenish', label: 'Replenish', icon: ArrowDownToLine },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/scan', label: 'Scan', icon: ScanLine },

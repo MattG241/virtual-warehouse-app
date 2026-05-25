@@ -8,6 +8,7 @@ import { Scan } from '@/routes/Scan'
 import { Reports } from '@/routes/Reports'
 import { Inventory } from '@/routes/Inventory'
 import { Alerts } from '@/routes/Alerts'
+import { Replenish } from '@/routes/Replenish'
 import { Placeholder } from '@/routes/Placeholder'
 import { applyTheme, useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
@@ -78,6 +79,14 @@ export default function App() {
           element={
             <AppShell title="Alerts">
               <Alerts />
+            </AppShell>
+          }
+        />
+        <Route
+          path="/replenish"
+          element={
+            <AppShell title="Replenishment">
+              <Replenish />
             </AppShell>
           }
         />

@@ -162,7 +162,7 @@ export function Reports() {
       <Card>
         <CardHeader eyebrow="Exports" title="Download CSV reports" />
         <CardBody>
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {EXPORTS.map((e) => (
               <li key={e.href}>
                 <a
