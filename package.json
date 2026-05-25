@@ -1,0 +1,20 @@
+{
+  "name": "virtual-warehouse-app",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Live warehouse stock visualiser, fed by Peoplevox WMS",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "sync:once": "node server/sync.js --once",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "fast-xml-parser": "^4.5.0",
+    "pg": "^8.13.1"
+  }
+}
