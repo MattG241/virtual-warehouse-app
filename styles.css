@@ -602,6 +602,27 @@ select:focus,
   cursor: not-allowed;
 }
 
+.auth-modal__toggle {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.auth-modal__toggle-btn {
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-modal__toggle-btn:hover {
+  text-decoration: underline;
+}
+
 .auth-modal__status {
   margin-top: 16px;
   padding: 12px 14px;

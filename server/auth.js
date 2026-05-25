@@ -1,18 +1,20 @@
 import jwt from 'jsonwebtoken';
+import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { pool } from './db.js';
+
+const scrypt = promisify(scryptCb);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
-const APP_URL = process.env.APP_URL || '';
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const RESEND_SENDER = process.env.RESEND_SENDER || 'onboarding@resend.dev';
 
 const COOKIE_NAME = 'session';
 const SESSION_TTL_DAYS = 30;
-const LOGIN_TOKEN_TTL_MIN = 15;
+const SCRYPT_KEYLEN = 64;
+const PASSWORD_MIN_LENGTH = 8;
 
 export function isAllowed(email) {
   if (!email) return false;
@@ -22,12 +24,60 @@ export function isAllowed(email) {
   return ALLOWED_EMAILS.includes(e);
 }
 
-export function makeLoginToken(email) {
-  return jwt.sign({ sub: email, type: 'login' }, JWT_SECRET, { expiresIn: `${LOGIN_TOKEN_TTL_MIN}m` });
+export function validateEmail(email) {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export function makeSessionToken(email) {
-  return jwt.sign({ sub: email, type: 'session' }, JWT_SECRET, { expiresIn: `${SESSION_TTL_DAYS}d` });
+export function validatePassword(password) {
+  return typeof password === 'string' && password.length >= PASSWORD_MIN_LENGTH;
+}
+
+export async function hashPassword(password) {
+  const salt = randomBytes(16);
+  const derived = await scrypt(password, salt, SCRYPT_KEYLEN);
+  return `scrypt$${salt.toString('hex')}$${derived.toString('hex')}`;
+}
+
+export async function verifyPasswordHash(password, stored) {
+  if (!stored || !stored.startsWith('scrypt$')) return false;
+  const [, saltHex, hashHex] = stored.split('$');
+  if (!saltHex || !hashHex) return false;
+  const salt = Buffer.from(saltHex, 'hex');
+  const expected = Buffer.from(hashHex, 'hex');
+  const derived = await scrypt(password, salt, SCRYPT_KEYLEN);
+  if (derived.length !== expected.length) return false;
+  return timingSafeEqual(derived, expected);
+}
+
+export async function findUser(email) {
+  const r = await pool.query(
+    `SELECT id, email, password_hash, created_at, last_login_at FROM users WHERE email = $1`,
+    [email.toLowerCase()],
+  );
+  return r.rows[0] || null;
+}
+
+export async function createUser(email, password) {
+  const hash = await hashPassword(password);
+  const r = await pool.query(
+    `INSERT INTO users (email, password_hash) VALUES ($1, $2)
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, email, created_at`,
+    [email.toLowerCase(), hash],
+  );
+  return r.rows[0] || null;
+}
+
+export async function markLogin(email) {
+  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE email = $1`, [
+    email.toLowerCase(),
+  ]);
+}
+
+function makeSessionToken(email) {
+  return jwt.sign({ sub: email, type: 'session' }, JWT_SECRET, {
+    expiresIn: `${SESSION_TTL_DAYS}d`,
+  });
 }
 
 function verifyToken(token, expectedType) {
@@ -38,10 +88,6 @@ function verifyToken(token, expectedType) {
   } catch (_) {
     return null;
   }
-}
-
-export function verifyLoginToken(token) {
-  return verifyToken(token, 'login');
 }
 
 export function authFromRequest(req) {
@@ -79,51 +125,6 @@ export function clearSessionCookie(res) {
   );
 }
 
-export async function sendMagicLink(email, link) {
-  if (!RESEND_API_KEY) {
-    // Dev fallback: print the link to logs so the operator can test before
-    // hooking up Resend. Tells the user what's happening rather than failing
-    // silently.
-    console.log(`\n[auth] No RESEND_API_KEY set — magic link for ${email}:\n    ${link}\n`);
-    return { delivered: 'logged' };
-  }
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: `Virtual Warehouse <${RESEND_SENDER}>`,
-      to: email,
-      subject: 'Your Virtual Warehouse sign-in link',
-      html: `
-        <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-          <h1 style="font-size: 18px; margin-bottom: 8px;">Sign in to Virtual Warehouse</h1>
-          <p style="color: #475569; font-size: 14px;">Click the button below to sign in. The link expires in ${LOGIN_TOKEN_TTL_MIN} minutes.</p>
-          <p style="margin: 24px 0;">
-            <a href="${link}" style="display: inline-block; padding: 10px 16px; background: #2563eb; color: #ffffff; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">Sign in</a>
-          </p>
-          <p style="color: #94a3b8; font-size: 12px;">If you didn't request this, you can ignore this email.</p>
-        </div>
-      `,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend ${res.status}: ${body.slice(0, 200)}`);
-  }
-  return { delivered: 'sent' };
-}
-
-export function appUrl(req) {
-  if (APP_URL) return APP_URL.replace(/\/$/, '');
-  const proto = req.get('x-forwarded-proto') || req.protocol;
-  return `${proto}://${req.get('host')}`;
-}
-
 export async function logAudit(email, action, payload) {
   try {
     await pool.query(
@@ -134,3 +135,5 @@ export async function logAudit(email, action, payload) {
     console.warn('[audit] insert failed:', e.message);
   }
 }
+
+export const PASSWORD_MIN = PASSWORD_MIN_LENGTH;

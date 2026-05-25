@@ -8,14 +8,17 @@ import { buildWarehouseData } from './shape.js';
 import { attachSseRoute, publish } from './events.js';
 import {
   isAllowed,
-  makeLoginToken,
-  verifyLoginToken,
+  validateEmail,
+  validatePassword,
+  PASSWORD_MIN,
+  findUser,
+  createUser,
+  markLogin,
+  verifyPasswordHash,
   setSessionCookie,
   clearSessionCookie,
   authFromRequest,
   requireAuth,
-  sendMagicLink,
-  appUrl,
   logAudit,
 } from './auth.js';
 
@@ -98,41 +101,63 @@ app.put('/api/layout', requireAuth, express.json({ limit: '2mb' }), async (req, 
 });
 
 // --- Auth endpoints -------------------------------------------------------
-app.post('/api/auth/request', express.json(), async (req, res) => {
+app.post('/api/auth/register', express.json(), async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
-  if (!email || !email.includes('@')) {
+  const password = String(req.body?.password || '');
+
+  if (!validateEmail(email)) {
     res.status(400).json({ error: 'valid email required' });
     return;
   }
-  // Always respond ok so we don't leak which emails are allowed.
+  if (!validatePassword(password)) {
+    res.status(400).json({ error: `password must be at least ${PASSWORD_MIN} characters` });
+    return;
+  }
   if (!isAllowed(email)) {
-    console.log(`[auth] sign-in attempt for unallowed email: ${email}`);
-    res.json({ ok: true });
+    // Don't reveal that we have an allow-list
+    res.status(403).json({ error: 'registration not permitted for this email' });
+    return;
+  }
+  const existing = await findUser(email);
+  if (existing) {
+    res.status(409).json({ error: 'an account already exists for this email' });
     return;
   }
   try {
-    const token = makeLoginToken(email);
-    const link = `${appUrl(req)}/api/auth/verify?token=${encodeURIComponent(token)}`;
-    const result = await sendMagicLink(email, link);
-    res.json({ ok: true, delivery: result.delivered });
+    await createUser(email, password);
+    setSessionCookie(res, email);
+    await markLogin(email);
+    await logAudit(email, 'auth.register', {});
+    res.json({ ok: true, user: { email } });
   } catch (e) {
-    console.error('[auth] send failed:', e.message);
-    res.status(500).json({ error: 'could not send sign-in link' });
+    console.error('[auth/register] error:', e);
+    res.status(500).json({ error: 'could not create account' });
   }
 });
 
-app.get('/api/auth/verify', async (req, res) => {
-  const claims = verifyLoginToken(String(req.query.token || ''));
-  if (!claims) {
-    res
-      .status(400)
-      .set('Content-Type', 'text/html')
-      .send(`<!doctype html><html><head><title>Sign-in failed</title><meta charset="utf-8"><style>body{font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:80px auto;padding:24px;color:#0f172a}h1{font-size:20px}a{color:#2563eb}</style></head><body><h1>Invalid or expired link</h1><p>Sign-in links expire after 15 minutes. <a href="/">Try again</a>.</p></body></html>`);
+app.post('/api/auth/login', express.json(), async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '');
+
+  if (!validateEmail(email) || !password) {
+    res.status(400).json({ error: 'email and password required' });
     return;
   }
-  setSessionCookie(res, claims.sub);
-  await logAudit(claims.sub, 'auth.login', {});
-  res.redirect('/');
+  try {
+    const user = await findUser(email);
+    if (!user || !(await verifyPasswordHash(password, user.password_hash))) {
+      // Same response for unknown email and wrong password — no enumeration.
+      res.status(401).json({ error: 'invalid email or password' });
+      return;
+    }
+    setSessionCookie(res, email);
+    await markLogin(email);
+    await logAudit(email, 'auth.login', {});
+    res.json({ ok: true, user: { email } });
+  } catch (e) {
+    console.error('[auth/login] error:', e);
+    res.status(500).json({ error: 'sign-in failed' });
+  }
 });
 
 app.get('/api/auth/me', (req, res) => {

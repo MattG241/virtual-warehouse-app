@@ -1,9 +1,10 @@
-// Magic-link sign-in modal + signed-in user chip + audit log peek.
-// Layout edits are gated server-side; this UI shows a "Sign in to edit" state
-// instead of letting users push to a 401.
+// Email + password sign-in / register modal, signed-in user chip,
+// audit log peek. Layout edits are gated server-side; this UI shows a
+// "Sign in to edit" state instead of letting users push to a 401.
 (() => {
   const STORAGE_KEY = 'vw.lastEmail';
   let currentUser = null;
+  let mode = 'login'; // 'login' or 'register'
 
   // --- Topbar slot ---------------------------------------------------------
   const topbarActions = document.querySelector('.topbar-actions');
@@ -21,23 +22,60 @@
     <div class="auth-modal__panel" role="dialog" aria-labelledby="authModalTitle">
       <button type="button" class="auth-modal__close" data-close aria-label="Close">×</button>
       <h2 id="authModalTitle" class="auth-modal__title">Sign in</h2>
-      <p class="auth-modal__intro">Enter your email and we'll send you a one-time sign-in link.</p>
+      <p class="auth-modal__intro" data-role="intro">Enter your email and password.</p>
       <form class="auth-modal__form">
         <label class="auth-modal__label">
           Email
           <input type="email" name="email" required autocomplete="email" placeholder="you@example.com">
         </label>
-        <button type="submit" class="primary-button auth-modal__submit">Send sign-in link</button>
+        <label class="auth-modal__label">
+          Password
+          <input type="password" name="password" required autocomplete="current-password" minlength="8" placeholder="At least 8 characters">
+        </label>
+        <button type="submit" class="auth-modal__submit" data-role="submit">Sign in</button>
       </form>
       <div class="auth-modal__status" hidden></div>
+      <div class="auth-modal__toggle">
+        <span data-role="toggle-prompt">No account yet?</span>
+        <button type="button" class="auth-modal__toggle-btn" data-role="toggle">Create one</button>
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
 
   const emailInput = modal.querySelector('input[name="email"]');
-  const submitBtn = modal.querySelector('.auth-modal__submit');
+  const passwordInput = modal.querySelector('input[name="password"]');
+  const submitBtn = modal.querySelector('[data-role="submit"]');
   const statusEl = modal.querySelector('.auth-modal__status');
+  const titleEl = modal.querySelector('#authModalTitle');
+  const introEl = modal.querySelector('[data-role="intro"]');
+  const togglePromptEl = modal.querySelector('[data-role="toggle-prompt"]');
+  const toggleBtn = modal.querySelector('[data-role="toggle"]');
   const form = modal.querySelector('.auth-modal__form');
+
+  function applyMode() {
+    if (mode === 'register') {
+      titleEl.textContent = 'Create account';
+      introEl.textContent = 'Use a work email that has been allow-listed. Password must be at least 8 characters.';
+      submitBtn.textContent = 'Create account';
+      passwordInput.autocomplete = 'new-password';
+      togglePromptEl.textContent = 'Already have an account?';
+      toggleBtn.textContent = 'Sign in';
+    } else {
+      titleEl.textContent = 'Sign in';
+      introEl.textContent = 'Enter your email and password.';
+      submitBtn.textContent = 'Sign in';
+      passwordInput.autocomplete = 'current-password';
+      togglePromptEl.textContent = 'No account yet?';
+      toggleBtn.textContent = 'Create one';
+    }
+    statusEl.hidden = true;
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    mode = mode === 'login' ? 'register' : 'login';
+    applyMode();
+  });
 
   modal.addEventListener('click', (e) => {
     if (e.target.closest('[data-close]')) closeModal();
@@ -49,46 +87,53 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = emailInput.value.trim();
-    if (!email) return;
+    const password = passwordInput.value;
+    if (!email || !password) return;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending…';
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = mode === 'register' ? 'Creating…' : 'Signing in…';
     try {
-      const res = await fetch('./api/auth/request', {
+      const endpoint = mode === 'register' ? './api/auth/register' : './api/auth/login';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
       const body = await res.json().catch(() => ({}));
-      localStorage.setItem(STORAGE_KEY, email);
-      statusEl.hidden = false;
-      if (body.delivery === 'logged') {
-        statusEl.innerHTML = `<strong>Email not configured.</strong> The sign-in link was printed to the server logs (Railway → service → Logs). Check there and click the link.`;
-        statusEl.className = 'auth-modal__status auth-modal__status--warn';
-      } else {
-        statusEl.innerHTML = `Check your inbox at <strong>${escapeHtml(email)}</strong> for a sign-in link. It expires in 15 minutes.`;
-        statusEl.className = 'auth-modal__status auth-modal__status--ok';
+      if (!res.ok) {
+        statusEl.hidden = false;
+        statusEl.className = 'auth-modal__status auth-modal__status--error';
+        statusEl.textContent = body.error || `Sign-in failed (HTTP ${res.status})`;
+        submitBtn.textContent = originalText;
+        return;
       }
-      submitBtn.textContent = 'Send another link';
+      localStorage.setItem(STORAGE_KEY, email);
+      // Successful auth — reload so the rest of the app sees the new cookie
+      window.location.reload();
     } catch (err) {
       statusEl.hidden = false;
       statusEl.className = 'auth-modal__status auth-modal__status--error';
-      statusEl.textContent = `Could not send link: ${err.message}`;
-      submitBtn.textContent = 'Try again';
+      statusEl.textContent = `Network error: ${err.message}`;
+      submitBtn.textContent = originalText;
     } finally {
       submitBtn.disabled = false;
     }
   });
 
-  function openModal() {
+  function openModal(initialMode = 'login') {
+    mode = initialMode;
+    applyMode();
     modal.hidden = false;
     emailInput.value = localStorage.getItem(STORAGE_KEY) || '';
-    setTimeout(() => emailInput.focus(), 50);
+    passwordInput.value = '';
+    setTimeout(() => {
+      (emailInput.value ? passwordInput : emailInput).focus();
+    }, 50);
     document.body.classList.add('auth-modal-open');
   }
   function closeModal() {
     modal.hidden = true;
     statusEl.hidden = true;
-    submitBtn.textContent = 'Send sign-in link';
     document.body.classList.remove('auth-modal-open');
   }
 
@@ -137,7 +182,7 @@
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (!action) return;
     if (action === 'signin') {
-      openModal();
+      openModal('login');
     } else if (action === 'menu') {
       const menu = authChip.querySelector('.auth-chip__menu');
       if (menu) menu.hidden = !menu.hidden;
