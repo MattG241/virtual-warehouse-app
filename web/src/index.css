@@ -27,6 +27,7 @@
   --good: 22 163 74;
   --warn: 245 158 11;
   --bad: 220 38 38;
+  --info: 56 130 246;
 }
 
 .dark {
@@ -49,6 +50,7 @@
   --good: 34 197 94;
   --warn: 245 158 11;
   --bad: 248 113 113;
+  --info: 96 165 250;
 }
 
 /* Accent overrides (set on <html data-accent="…"> by ThemeStore) */

@@ -30,7 +30,7 @@ export interface Inventory {
   syncStatus: SyncStatus | null
 }
 
-export type Status = 'empty' | 'low' | 'healthy'
+export type Status = 'empty' | 'critical' | 'low' | 'healthy'
 
 export interface SlotSummary {
   code: string // A01.B01.L01.S1

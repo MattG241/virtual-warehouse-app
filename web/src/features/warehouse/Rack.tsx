@@ -128,9 +128,31 @@ interface BoxProps {
   onSelect?: () => void
 }
 
+// Box visual state — four tiers colour-coded to match the status pills:
+//   blue   → empty (available for put-away)
+//   red    → critical (≤ 2 units, urgent)
+//   orange → low (≤ 5 units, replenish today)
+//   green  → healthy (> 5 units)
+// Vertical flap line + white label patch retained for the cardboard feel.
+const BOX_STYLES: Record<string, string> = {
+  empty:
+    'border border-dashed border-info/55 bg-info/10 hover:bg-info/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+  critical:
+    'border-[rgb(140_24_24)] bg-gradient-to-b from-[rgb(228_82_82)] via-[rgb(196_46_46)] to-[rgb(140_24_24)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]',
+  low:
+    'border-[rgb(140_82_18)] bg-gradient-to-b from-[rgb(250_180_88)] via-[rgb(220_133_30)] to-[rgb(155_88_14)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]',
+  healthy:
+    'border-[rgb(20_92_46)] bg-gradient-to-b from-[rgb(74_198_120)] via-[rgb(34_158_84)] to-[rgb(22_106_56)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]',
+}
+
 function Box({ slot, compact, selected, onSelect }: BoxProps) {
   const isEmpty = slot.status === 'empty'
-  const isLow = slot.status === 'low'
+  const labelTone =
+    slot.status === 'empty'
+      ? 'text-info/80 bg-info/15'
+      : slot.status === 'critical'
+        ? 'text-white bg-black/35'
+        : 'text-black/85 bg-white/95'
 
   return (
     <button
@@ -138,46 +160,40 @@ function Box({ slot, compact, selected, onSelect }: BoxProps) {
       onClick={onSelect}
       data-code={slot.code}
       aria-label={`${slot.code} — ${slot.status}, ${fmtN(slot.totalUnits)} units`}
-      title={`${slot.code} · ${fmtN(slot.totalUnits)} units`}
+      title={`${slot.code} · ${slot.status} · ${fmtN(slot.totalUnits)} units`}
       className={cn(
         'group relative flex-1 cursor-pointer overflow-hidden rounded-[3px] border-b-[2px] outline-none transition-transform',
         compact ? 'h-9 min-w-[26px]' : 'h-12 min-w-[34px]',
-        // Visual states
-        isEmpty
-          ? 'border border-dashed border-white/15 bg-black/20'
-          : isLow
-            ? 'border-[#7a4d1d] bg-gradient-to-b from-[#c79870] via-[#a87340] to-[#754d24] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]'
-            : 'border-[#5b3a1a] bg-gradient-to-b from-[#c79059] via-[#9d6635] to-[#6b4422] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]',
+        BOX_STYLES[slot.status],
         'hover:z-10 hover:-translate-y-[1px] hover:shadow-[0_4px_10px_-2px_rgb(0_0_0_/_0.5)]',
         selected &&
           'z-20 ring-2 ring-brand outline-offset-1 shadow-[0_0_0_2px_rgb(var(--brand)),0_8px_18px_-4px_rgb(var(--brand)/0.6)]',
       )}
     >
-      {/* Vertical box flap line (visual realism) */}
+      {/* Vertical "box flap" line — keeps the cardboard look for stocked boxes */}
       {!isEmpty && (
         <span
-          className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/15"
+          className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-black/20"
           aria-hidden
         />
       )}
-      {/* Status indicator dot for low */}
-      {isLow && (
+      {/* Critical pulse dot — catches the eye at a glance */}
+      {slot.status === 'critical' && (
         <span
-          className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-warn ring-1 ring-black/40"
+          className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 animate-pulse-soft rounded-full bg-white ring-1 ring-black/40"
           aria-hidden
         />
       )}
-      {/* White label patch with location code */}
-      {!isEmpty && (
-        <span
-          className={cn(
-            'pointer-events-none absolute left-1/2 top-[3px] flex -translate-x-1/2 items-center justify-center rounded-[1px] bg-white/95 text-[7px] font-bold leading-none text-black/80 ring-1 ring-black/10',
-            compact ? 'h-3 w-[80%] text-[6.5px]' : 'h-3.5 w-[80%] text-[7px]',
-          )}
-        >
-          {slot.slot}
-        </span>
-      )}
+      {/* Location label patch — slot number shown on every box */}
+      <span
+        className={cn(
+          'pointer-events-none absolute left-1/2 top-[3px] flex -translate-x-1/2 items-center justify-center rounded-[1px] text-[7px] font-bold leading-none ring-1 ring-black/10',
+          compact ? 'h-3 w-[80%] text-[6.5px]' : 'h-3.5 w-[80%] text-[7px]',
+          labelTone,
+        )}
+      >
+        {slot.slot}
+      </span>
     </button>
   )
 }

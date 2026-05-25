@@ -7,13 +7,14 @@ import { perSku, fmtN, type SkuSummary } from '@/lib/inventory'
 import { cn } from '@/lib/cn'
 import type { Status } from '@/lib/types'
 
-type FilterKey = 'all' | 'healthy' | 'low' | 'empty'
+type FilterKey = 'all' | 'healthy' | 'low' | 'critical' | 'empty'
 
-const FILTERS: { key: FilterKey; label: string; tone: 'subtle' | 'good' | 'warn' | 'bad' }[] = [
+const FILTERS: { key: FilterKey; label: string; tone: 'subtle' | 'good' | 'warn' | 'bad' | 'info' }[] = [
   { key: 'all', label: 'All', tone: 'subtle' },
   { key: 'healthy', label: 'Stocked', tone: 'good' },
   { key: 'low', label: 'Low', tone: 'warn' },
-  { key: 'empty', label: 'Empty', tone: 'bad' },
+  { key: 'critical', label: 'Critical', tone: 'bad' },
+  { key: 'empty', label: 'Empty', tone: 'info' },
 ]
 
 export function Inventory() {
@@ -26,7 +27,7 @@ export function Inventory() {
   const skus = useMemo(() => (inv ? perSku(inv) : []), [inv])
 
   const counts = useMemo(() => {
-    const c = { healthy: 0, low: 0, empty: 0 }
+    const c = { healthy: 0, low: 0, critical: 0, empty: 0 }
     for (const s of skus) c[s.status]++
     return c
   }, [skus])
@@ -99,7 +100,9 @@ export function Inventory() {
                           ? 'border-warn/40 bg-warn/15 text-warn'
                           : f.tone === 'bad'
                             ? 'border-bad/40 bg-bad/15 text-bad'
-                            : 'border-brand-ring/40 bg-brand/15 text-brand'
+                            : f.tone === 'info'
+                              ? 'border-info/40 bg-info/15 text-info'
+                              : 'border-brand-ring/40 bg-brand/15 text-brand'
                       : 'border-line bg-surface text-muted hover:border-line-strong hover:text-ink',
                   )}
                 >
@@ -134,12 +137,13 @@ export function Inventory() {
                         'grid h-10 w-10 flex-shrink-0 place-items-center rounded-md text-xs font-bold',
                         s.status === 'healthy' && 'bg-good/15 text-good',
                         s.status === 'low' && 'bg-warn/15 text-warn',
-                        s.status === 'empty' && 'bg-bad/15 text-bad',
+                        s.status === 'critical' && 'bg-bad/15 text-bad',
+                        s.status === 'empty' && 'bg-info/15 text-info',
                       )}
                     >
                       {s.status === 'empty' ? (
                         <CircleSlash2 className="h-4 w-4" />
-                      ) : s.status === 'low' ? (
+                      ) : s.status === 'critical' || s.status === 'low' ? (
                         <AlertTriangle className="h-4 w-4" />
                       ) : (
                         <Check className="h-4 w-4" />

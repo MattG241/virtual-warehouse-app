@@ -13,7 +13,7 @@ import { perSku, perAisle, fmtN, timeAgo } from '@/lib/inventory'
 import { fetchSyncStatus, type SyncRun } from '@/lib/api'
 import { cn } from '@/lib/cn'
 
-type AlertTab = 'all' | 'low' | 'zero' | 'aisle' | 'sync'
+type AlertTab = 'all' | 'critical' | 'low' | 'zero' | 'aisle' | 'sync'
 
 export function Alerts() {
   const inv = useInventory((s) => s.inventory)
@@ -28,6 +28,10 @@ export function Alerts() {
   const skus = useMemo(() => (inv ? perSku(inv) : []), [inv])
   const aisles = useMemo(() => (inv ? perAisle(inv) : []), [inv])
 
+  const criticalSkus = useMemo(
+    () => skus.filter((s) => s.status === 'critical').slice(0, 100),
+    [skus],
+  )
   const lowSkus = useMemo(
     () => skus.filter((s) => s.status === 'low').slice(0, 100),
     [skus],
@@ -46,17 +50,20 @@ export function Alerts() {
   const failedRuns = useMemo(() => runs.filter((r) => r.status !== 'ok'), [runs])
 
   const counts = {
+    critical: criticalSkus.length,
     low: lowSkus.length,
     zero: zeroSkus.length,
     aisle: lowAisles.length,
     sync: failedRuns.length,
   }
-  const total = counts.low + counts.zero + counts.aisle + counts.sync
+  const total =
+    counts.critical + counts.low + counts.zero + counts.aisle + counts.sync
 
   if (!inv) return null
 
   const tabs: { key: AlertTab; label: string; n: number }[] = [
     { key: 'all', label: 'All', n: total },
+    { key: 'critical', label: 'Critical', n: counts.critical },
     { key: 'low', label: 'Low stock', n: counts.low },
     { key: 'zero', label: 'Zero stock', n: counts.zero },
     { key: 'aisle', label: 'Empty aisles', n: counts.aisle },
@@ -66,9 +73,10 @@ export function Alerts() {
   return (
     <div className="space-y-4">
       {/* Summary strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        <SummaryTile label="Critical" n={counts.critical} tone="bad" icon={<AlertTriangle className="h-4 w-4" />} />
         <SummaryTile label="Low stock" n={counts.low} tone="warn" icon={<AlertTriangle className="h-4 w-4" />} />
-        <SummaryTile label="Zero stock" n={counts.zero} tone="bad" icon={<CircleSlash2 className="h-4 w-4" />} />
+        <SummaryTile label="Zero stock" n={counts.zero} tone="info" icon={<CircleSlash2 className="h-4 w-4" />} />
         <SummaryTile label="Empty aisles" n={counts.aisle} tone="bad" icon={<AlertTriangle className="h-4 w-4" />} />
         <SummaryTile label="Sync failures" n={counts.sync} tone={counts.sync > 0 ? 'bad' : 'good'} icon={<XCircle className="h-4 w-4" />} />
       </div>
@@ -110,6 +118,41 @@ export function Alerts() {
                 No active alerts. Stock levels are healthy and the last sync ran cleanly.
               </p>
             </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {(tab === 'all' || tab === 'critical') && criticalSkus.length > 0 && (
+        <Card>
+          <CardHeader
+            eyebrow="Critical"
+            title={`${counts.critical} SKU${counts.critical === 1 ? '' : 's'} at ≤ 2 units`}
+          />
+          <CardBody className="!p-0">
+            <ul className="divide-y divide-line">
+              {criticalSkus.map((s) => (
+                <li key={s.sku}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/inventory?q=${encodeURIComponent(s.sku)}`)}
+                    className="group flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-surface-2"
+                  >
+                    <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-bad/15 text-bad">
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-mono text-sm font-semibold text-ink">{s.sku}</div>
+                      <div className="truncate text-[11px] text-muted">{s.name || '—'}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tnum text-sm font-bold text-bad">{fmtN(s.totalUnits)}</div>
+                      <div className="text-[10px] text-muted">{s.locations} loc</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-subtle transition group-hover:translate-x-1 group-hover:text-ink" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           </CardBody>
         </Card>
       )}
@@ -192,7 +235,7 @@ export function Alerts() {
             title={`${counts.aisle} aisle${counts.aisle === 1 ? '' : 's'} below 10% stocked`}
           />
           <CardBody>
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {lowAisles.map((a) => {
                 const pct = a.total ? Math.round((a.stocked / a.total) * 100) : 0
                 return (
@@ -261,7 +304,7 @@ function SummaryTile({
 }: {
   label: string
   n: number
-  tone: 'warn' | 'bad' | 'good'
+  tone: 'warn' | 'bad' | 'good' | 'info'
   icon: React.ReactNode
 }) {
   return (
@@ -271,6 +314,7 @@ function SummaryTile({
         tone === 'warn' && 'border-warn/30',
         tone === 'bad' && 'border-bad/30',
         tone === 'good' && 'border-good/30',
+        tone === 'info' && 'border-info/30',
       )}
     >
       <span
@@ -279,6 +323,7 @@ function SummaryTile({
           tone === 'warn' && 'bg-warn/15 text-warn',
           tone === 'bad' && 'bg-bad/15 text-bad',
           tone === 'good' && 'bg-good/15 text-good',
+          tone === 'info' && 'bg-info/15 text-info',
         )}
       >
         {icon}

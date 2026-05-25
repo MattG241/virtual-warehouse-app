@@ -140,7 +140,7 @@ function LowStockWidget() {
             body="No bins are between 1 and 5 units. Stock levels look healthy."
           />
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {lowStock.map((slot) => (
               <li key={slot.code}>
                 <button
@@ -194,7 +194,7 @@ function TopSkusWidget() {
         }
       />
       <CardBody className="!pt-1">
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {top.map((s, i) => (
             <li key={s.sku}>
               <button
@@ -312,7 +312,7 @@ function SyncHistoryWidget() {
         }
       />
       <CardBody>
-        <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="relative inline-flex h-3 w-3">

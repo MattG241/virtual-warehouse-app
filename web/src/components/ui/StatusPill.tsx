@@ -8,14 +8,25 @@ interface Props {
 
 const LABELS: Record<Status, string> = {
   empty: 'Empty',
+  critical: 'Critical',
   low: 'Low',
   healthy: 'Stocked',
 }
 
+// Four-state palette: blue/red/orange/green. Same tones drive the rack
+// box fills so the dashboard reads against the warehouse view.
 const STYLES: Record<Status, string> = {
-  empty: 'bg-bad/15 text-bad ring-bad/30',
+  empty: 'bg-info/15 text-info ring-info/30',
+  critical: 'bg-bad/15 text-bad ring-bad/30',
   low: 'bg-warn/15 text-warn ring-warn/30',
   healthy: 'bg-good/15 text-good ring-good/30',
+}
+
+const DOTS: Record<Status, string> = {
+  empty: 'bg-info',
+  critical: 'bg-bad',
+  low: 'bg-warn',
+  healthy: 'bg-good',
 }
 
 export function StatusPill({ status, className }: Props) {
@@ -27,14 +38,7 @@ export function StatusPill({ status, className }: Props) {
         className,
       )}
     >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          status === 'empty' && 'bg-bad',
-          status === 'low' && 'bg-warn',
-          status === 'healthy' && 'bg-good',
-        )}
-      />
+      <span className={cn('h-1.5 w-1.5 rounded-full', DOTS[status])} />
       {LABELS[status]}
     </span>
   )
