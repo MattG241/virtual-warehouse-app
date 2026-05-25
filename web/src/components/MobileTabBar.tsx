@@ -6,7 +6,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { MoreSheet } from '@/features/more/MoreSheet'
-import { useNavBadges } from '@/features/nav/badges'
 
 interface Item {
   to: string
@@ -26,7 +25,6 @@ const ITEMS: Item[] = [
 
 export function MobileTabBar() {
   const [moreOpen, setMoreOpen] = useState(false)
-  const badges = useNavBadges()
   return (
     <>
       <nav
@@ -34,41 +32,31 @@ export function MobileTabBar() {
         aria-label="Primary"
       >
         <div className="mx-auto flex max-w-md items-stretch justify-around gap-1">
-          {ITEMS.map(({ to, label, icon: Icon }) => {
-            const badge = to === '/replenish' ? badges.replen : 0
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition',
-                    isActive ? 'text-brand' : 'text-muted active:text-ink',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className="relative">
-                      <Icon
-                        className={cn(
-                          'h-5 w-5 transition',
-                          isActive && 'drop-shadow-[0_0_6px_rgb(var(--brand)/0.7)]',
-                        )}
-                      />
-                      {badge > 0 && (
-                        <span className="absolute -right-2 -top-1 grid h-3.5 min-w-[0.875rem] place-items-center rounded-full bg-warn px-1 text-[8px] font-bold leading-none text-white ring-2 ring-bg">
-                          {badge > 99 ? '99' : badge}
-                        </span>
-                      )}
-                    </span>
-                    <span className="truncate">{label}</span>
-                  </>
-                )}
-              </NavLink>
-            )
-          })}
+          {ITEMS.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition',
+                  isActive ? 'text-brand' : 'text-muted active:text-ink',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    className={cn(
+                      'h-5 w-5 transition',
+                      isActive && 'drop-shadow-[0_0_6px_rgb(var(--brand)/0.7)]',
+                    )}
+                  />
+                  <span className="truncate">{label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
@@ -78,19 +66,12 @@ export function MobileTabBar() {
             )}
             aria-label="More"
           >
-            <span className="relative">
-              <MoreHorizontal
-                className={cn(
-                  'h-5 w-5 transition',
-                  moreOpen && 'drop-shadow-[0_0_6px_rgb(var(--brand)/0.7)]',
-                )}
-              />
-              {badges.alerts > 0 && (
-                <span className="absolute -right-2 -top-1 grid h-3.5 min-w-[0.875rem] place-items-center rounded-full bg-bad px-1 text-[8px] font-bold leading-none text-white ring-2 ring-bg">
-                  {badges.alerts > 99 ? '99' : badges.alerts}
-                </span>
+            <MoreHorizontal
+              className={cn(
+                'h-5 w-5 transition',
+                moreOpen && 'drop-shadow-[0_0_6px_rgb(var(--brand)/0.7)]',
               )}
-            </span>
+            />
             <span className="truncate">More</span>
           </button>
         </div>
