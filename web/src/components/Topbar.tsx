@@ -62,10 +62,14 @@ export function Topbar({ title }: Props) {
   return (
     <header className="sticky top-0 z-30 -mx-4 mb-5 flex items-center gap-3 border-b border-line/60 bg-bg/80 px-4 py-3 backdrop-blur-xl sm:mx-0 sm:rounded-xl sm:border sm:border-line sm:px-5">
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
+        {/* Eyebrow only on desktop — mobile gets the iOS-style single-line
+            navigation title for a cleaner phone chrome. */}
+        <p className="hidden sm:block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
           Warehouse OS
         </p>
-        <h2 className="truncate text-lg font-semibold text-ink sm:text-xl">{title}</h2>
+        <h2 className="truncate text-[20px] font-bold tracking-tight text-ink sm:text-xl sm:font-semibold">
+          {title}
+        </h2>
       </div>
 
       {/* Desktop: real input. Typing pops the overlay with the typed text
