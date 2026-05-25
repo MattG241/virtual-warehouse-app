@@ -177,6 +177,12 @@ export function Warehouse3D({ onClose }: Props) {
   // Label fontSize scales with scene so aisle/bay labels stay readable.
   const labelSize = Math.max(0.5, bounds.size * 0.028)
 
+  // Initial camera zoom that frames the warehouse. Computed once here so
+  // OrbitControls can scale its min/max relative to it — otherwise an
+  // absolute maxZoom (5) clamps the initial framing zoom (~10 on a real
+  // warehouse) and you can't pinch in past the starting view.
+  const initialZoom = Math.max(2, Math.min(40, 320 / Math.max(bounds.size, 1)))
+
   // WebGL feature-detect — some embedded webviews / very old browsers
   // can't run Three.js. Render a graceful fallback instead of a black
   // void so the page still feels alive.
@@ -220,14 +226,19 @@ export function Warehouse3D({ onClose }: Props) {
         style={{ background: 'radial-gradient(ellipse at center, #11203a 0%, #050a14 70%)' }}
       >
         <color attach="background" args={['#0a1428']} />
-        <SceneCamera centre={bounds.centre} size={bounds.size} />
+        <SceneCamera centre={bounds.centre} size={bounds.size} zoom={initialZoom} />
         <OrbitControls
           ref={controlsRef as never}
           enablePan
           enableRotate
           enableZoom
-          minZoom={0.3}
-          maxZoom={5}
+          zoomToCursor
+          zoomSpeed={1.4}
+          // min/max scale with the initial framing zoom — absolute caps
+          // (the old 0.3/5) either clipped the starting view or made it
+          // impossible to pinch in close enough to read a single bay.
+          minZoom={initialZoom * 0.35}
+          maxZoom={initialZoom * 25}
           target={bounds.centre}
           dampingFactor={0.12}
         />
@@ -356,9 +367,11 @@ export function Warehouse3D({ onClose }: Props) {
 function SceneCamera({
   centre,
   size,
+  zoom,
 }: {
   centre: [number, number, number]
   size: number
+  zoom: number
 }) {
   // Isometric position — 45° azimuth, ~38° elevation (slightly higher
   // than classic 30° so the whole warehouse footprint stays readable
@@ -373,11 +386,6 @@ function SceneCamera({
   // target sits ~1.7× `distance` from the lens, so fixed values clipped
   // every block on real warehouses.
   const depth = Math.max(500, size * 5)
-  // Zoom: fit the longest scene axis with ~10% padding. Floor at 2
-  // (zoomed-way-out) for huge warehouses, ceiling at 40 so a tiny test
-  // scene doesn't blow up to 360×.
-  const safeSize = Math.max(size, 1)
-  const zoom = Math.max(2, Math.min(40, 320 / safeSize))
   return (
     <OrthographicCamera
       makeDefault
