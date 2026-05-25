@@ -351,8 +351,7 @@ button {
 .search-field__icon {
   position: absolute;
   left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 12px;
   color: var(--muted);
   pointer-events: none;
   transition: color var(--t-fast);
@@ -999,8 +998,7 @@ body.is-signed-out #layoutView .section-heading::after {
 .scan-button {
   position: absolute;
   right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 4px;
   width: 30px;
   height: 30px;
   display: grid;
@@ -3210,17 +3208,19 @@ td {
     margin-top: 0;
   }
 
+  /* Flex+wrap is friendlier than grid for an unknown number of buttons —
+     keeps spacing even on the second row (was: sync hugged left, others
+     pushed to the right by an unintended 1fr column). */
   .topbar-actions {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto;
-    grid-template-rows: auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
   }
 
   /* Row 1: search across the full width */
   .search-field {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
     max-width: none;
   }
 
@@ -3229,14 +3229,7 @@ td {
     min-height: 40px;
   }
 
-  /* Row 2 (auto-flow): icon buttons + auth chip share one row */
-  #syncNowButton,
-  .export-menu,
-  .auth-chip {
-    grid-column: auto;
-  }
-
-  /* Auth chip takes whatever's left in row 2 */
+  /* Auth chip pushed to the right end of the button row */
   .auth-chip {
     margin-left: auto;
   }
@@ -3269,8 +3262,10 @@ td {
 
   .panel-toolbar [data-warehouse-mode] {
     padding: 8px 4px;
-    font-size: 12px;
+    font-size: 11px;
     width: 100%;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   /* Highlight empties + Prev/Bay/Next stepper share a single row */
@@ -3284,20 +3279,44 @@ td {
   .toolbar-tail .stepper {
     display: flex;
     gap: 4px;
+    align-items: stretch;
   }
 
-  /* Aisle strip scrolls horizontally instead of wrapping */
+  .toolbar-tail .stepper button {
+    padding: 0 10px;
+  }
+
+  /* Compact stepper label — was wrapping to 2 lines with "Odd / Left" */
+  #currentBayLabel,
+  #currentShelfLabel {
+    min-width: 56px;
+    font-size: 13px;
+    white-space: nowrap;
+    display: grid;
+    place-items: center;
+  }
+
+  /* Aisle strip scrolls horizontally — add a right-edge fade so the cut-off
+     edge reads as "more here, swipe" instead of just being clipped. */
   .aisle-strip {
     overflow-x: auto;
     flex-wrap: nowrap;
     scroll-snap-type: x mandatory;
     padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
 
   .aisle-strip > button {
     flex: 0 0 auto;
     scroll-snap-align: start;
     min-height: 38px;
+  }
+
+  /* Hint pills overlap the 3D view on phones — they're optional context */
+  .three-hud {
+    display: none;
   }
 
   /* Compact the 3D stage on phone — still tall enough to be useful */
@@ -3382,5 +3401,126 @@ td {
   .shelf-row-boxes,
   .box-line {
     grid-template-columns: repeat(2, minmax(90px, 1fr));
+  }
+
+  /* --- Search on mobile -------------------------------------------------- */
+
+  /* Dropdown: larger tap targets, viewport-relative height so the on-screen
+     keyboard never hides the last result. */
+  .search-results {
+    max-height: min(360px, calc(100vh - 220px));
+    padding: 4px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+  }
+
+  .search-result {
+    padding: 11px 12px;
+    min-height: 48px;
+  }
+
+  .search-result__title {
+    font-size: 14px;
+  }
+
+  .search-result__meta {
+    font-size: 12px;
+    line-height: 1.35;
+    margin-top: 3px;
+  }
+
+  .search-group-label {
+    padding: 10px 12px 4px;
+  }
+
+  .search-empty {
+    padding: 16px 14px;
+    font-size: 13px;
+  }
+
+  /* Active chip: inline (push content down) instead of absolute-overlapping
+     the toolbar below. Lets the user see the chip + scene without a fight. */
+  .search-field--with-results {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .search-field--with-results > input {
+    flex: 1 1 100%;
+  }
+
+  .search-active-chip {
+    position: static;
+    flex: 1 1 100%;
+    margin-top: 0;
+    padding: 10px 12px;
+    gap: 8px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .search-active-info {
+    flex: 1 1 auto;
+    gap: 6px 10px;
+  }
+
+  .search-active-actions {
+    gap: 6px;
+  }
+
+  /* Bigger nav + clear targets — 26/22px is too small for thumbs */
+  .search-active-nav {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .search-active-clear {
+    width: 34px;
+    height: 34px;
+    font-size: 20px;
+  }
+
+  /* Inventory Control table — hide the columns whose info is already
+     encoded in the Location code (Aisle / Bay / Side / L / Box). Trims
+     ~5 columns of horizontal scroll on phones. Excludes .other-table
+     which only has 5 distinct columns. */
+  .table-wrap:not(.other-wrap) thead tr > :nth-child(2),
+  .table-wrap:not(.other-wrap) thead tr > :nth-child(3),
+  .table-wrap:not(.other-wrap) thead tr > :nth-child(4),
+  .table-wrap:not(.other-wrap) thead tr > :nth-child(5),
+  .table-wrap:not(.other-wrap) thead tr > :nth-child(6),
+  .table-wrap:not(.other-wrap) tbody tr > :nth-child(2),
+  .table-wrap:not(.other-wrap) tbody tr > :nth-child(3),
+  .table-wrap:not(.other-wrap) tbody tr > :nth-child(4),
+  .table-wrap:not(.other-wrap) tbody tr > :nth-child(5),
+  .table-wrap:not(.other-wrap) tbody tr > :nth-child(6) {
+    display: none;
+  }
+
+  /* Trimmed table doesn't need the 1220px desktop min-width. Let columns
+     size to content; horizontal scroll on .table-wrap covers what's left. */
+  .table-wrap table {
+    min-width: 0;
+  }
+
+  th, td {
+    padding: 10px 10px;
+    font-size: 12px;
+  }
+
+  .stock-cell {
+    min-width: 0;
+  }
+
+  .status-tag {
+    font-size: 11px;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+
+  .box-action {
+    padding: 0 10px;
+    font-size: 12px;
   }
 }

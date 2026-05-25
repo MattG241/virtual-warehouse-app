@@ -496,7 +496,8 @@ function renderAisleSelector() {
 
   const aisle = getAisle();
   const bay = getBay();
-  els.currentBayLabel.textContent = bay ? `${bay.id} ${baySideLabel(bay)}` : "B--";
+  const sideShort = bay ? (bay.side === "left" ? "L" : "R") : "";
+  els.currentBayLabel.textContent = bay ? `${bay.id} · ${sideShort}` : "B--";
   els.prevBayButton.disabled = bayIndex <= 0;
   els.nextBayButton.disabled = bayIndex >= aisle.bays.length - 1;
 }
