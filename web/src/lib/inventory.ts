@@ -128,6 +128,53 @@ export function perAisle(inv: Inventory) {
   return [...map.values()].sort((a, b) => a.aisle.localeCompare(b.aisle))
 }
 
+export interface SkuSummary {
+  sku: string
+  name: string
+  totalUnits: number
+  locations: number
+  status: Status
+  color?: string
+  size?: string
+}
+
+/** Per-SKU rollup across every grid location + other-locations. Sorted by
+ *  units descending so the busiest items lead. */
+export function perSku(inv: Inventory): SkuSummary[] {
+  const map = new Map<string, { units: number; locs: Set<string> }>()
+  for (const [code, entries] of Object.entries(inv.grid)) {
+    for (const [sku, qty] of entries) {
+      const n = Number(qty) || 0
+      if (!map.has(sku)) map.set(sku, { units: 0, locs: new Set() })
+      const agg = map.get(sku)!
+      agg.units += n
+      if (n > 0) agg.locs.add(code)
+    }
+  }
+  for (const row of inv.other) {
+    const [loc, sku, qty] = row
+    const n = Number(qty) || 0
+    if (!map.has(sku)) map.set(sku, { units: 0, locs: new Set() })
+    const agg = map.get(sku)!
+    agg.units += n
+    if (n > 0) agg.locs.add(String(loc))
+  }
+  const out: SkuSummary[] = []
+  for (const [sku, agg] of map) {
+    const meta = inv.skus[sku]
+    out.push({
+      sku,
+      name: meta?.[0] || '',
+      color: meta?.[1] || undefined,
+      size: meta?.[2] || undefined,
+      totalUnits: agg.units,
+      locations: agg.locs.size,
+      status: statusFor(agg.units),
+    })
+  }
+  return out.sort((a, b) => b.totalUnits - a.totalUnits)
+}
+
 /** Format helpers */
 export function fmtN(n: number) {
   return Number(n || 0).toLocaleString()

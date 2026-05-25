@@ -6,6 +6,8 @@ import { Warehouse } from '@/routes/Warehouse'
 import { AisleView } from '@/routes/AisleView'
 import { Scan } from '@/routes/Scan'
 import { Reports } from '@/routes/Reports'
+import { Inventory } from '@/routes/Inventory'
+import { Alerts } from '@/routes/Alerts'
 import { Placeholder } from '@/routes/Placeholder'
 import { applyTheme, useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
@@ -67,7 +69,7 @@ export default function App() {
           path="/inventory"
           element={
             <AppShell title="Inventory">
-              <Placeholder title="Inventory" />
+              <Inventory />
             </AppShell>
           }
         />
@@ -75,7 +77,7 @@ export default function App() {
           path="/alerts"
           element={
             <AppShell title="Alerts">
-              <Placeholder title="Active alerts" />
+              <Alerts />
             </AppShell>
           }
         />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Bell, Sun, Moon, RefreshCw } from 'lucide-react'
+import { Search, Sun, Moon, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
@@ -7,6 +7,7 @@ import { syncNow } from '@/lib/api'
 import { timeAgo } from '@/lib/inventory'
 import { cn } from '@/lib/cn'
 import { useSearch } from '@/features/search/store'
+import { SettingsSheet } from '@/features/settings/SettingsSheet'
 
 interface Props {
   title: string
@@ -20,6 +21,7 @@ export function Topbar({ title }: Props) {
   const openSearch = useSearch((s) => s.open)
   const [syncing, setSyncing] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Keep "x mins ago" fresh without thrashing
   useEffect(() => {
@@ -107,11 +109,15 @@ export function Topbar({ title }: Props) {
       <Button
         variant="ghost"
         size="md"
-        className="!h-10 !w-10 !p-0 hidden sm:inline-flex"
-        aria-label="Alerts"
+        onClick={() => setSettingsOpen(true)}
+        className="!h-10 !w-10 !p-0"
+        aria-label="Settings"
+        title="Theme, accent, dashboard widgets"
       >
-        <Bell className="h-4 w-4" />
+        <SettingsIcon className="h-4 w-4" />
       </Button>
+
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   )
 }
