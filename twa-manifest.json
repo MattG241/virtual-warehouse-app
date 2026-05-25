@@ -1,0 +1,40 @@
+{
+  "packageId": "com.ryderwear.virtualwarehouse",
+  "host": "virtual-warehouse-app-production.up.railway.app",
+  "name": "Virtual Warehouse",
+  "launcherName": "Warehouse",
+  "display": "standalone",
+  "orientation": "any",
+  "themeColor": "#070b14",
+  "navigationColor": "#070b14",
+  "navigationColorDark": "#070b14",
+  "navigationDividerColor": "#1e293b",
+  "navigationDividerColorDark": "#1e293b",
+  "backgroundColor": "#070b14",
+  "enableNotifications": true,
+  "startUrl": "/?source=twa",
+  "iconUrl": "https://virtual-warehouse-app-production.up.railway.app/icon-512.png",
+  "maskableIconUrl": "https://virtual-warehouse-app-production.up.railway.app/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    { "name": "Scan", "shortName": "Scan", "url": "/scan", "chosenIdx": 0 },
+    { "name": "Pick", "shortName": "Pick", "url": "/pick", "chosenIdx": 0 },
+    { "name": "Alerts", "shortName": "Alerts", "url": "/alerts", "chosenIdx": 0 }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://virtual-warehouse-app-production.up.railway.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://virtual-warehouse-app-production.up.railway.app/",
+  "minSdkVersion": 21
+}

@@ -12,7 +12,10 @@ import { Replenish } from '@/routes/Replenish'
 import { Pick } from '@/routes/Pick'
 import { Settings } from '@/routes/Settings'
 import { LayoutEditor } from '@/routes/LayoutEditor'
+import { About } from '@/routes/About'
 import { NotFound } from '@/routes/NotFound'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { ShortcutsHelp } from '@/features/shortcuts/ShortcutsHelp'
 import { applyTheme, useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
 import { useAuth } from '@/features/auth/store'
@@ -50,10 +53,12 @@ function AuthBridge() {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <ThemeBridge />
       <InventoryBridge />
       <AuthBridge />
+      <ShortcutsHelp />
       <Routes>
         <Route
           path="/"
@@ -144,6 +149,14 @@ export default function App() {
           }
         />
         <Route
+          path="/about"
+          element={
+            <AppShell title="About">
+              <About />
+            </AppShell>
+          }
+        />
+        <Route
           path="*"
           element={
             <AppShell title="Not found">
@@ -153,5 +166,6 @@ export default function App() {
         />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }

@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   X, PackageSearch, Bell, BarChart3, LayoutGrid, ScanLine,
   ArrowDownToLine, Settings as SettingsIcon, LogIn, LogOut,
-  Route as RouteIcon, ChevronRight, type LucideIcon,
+  Route as RouteIcon, Info, ChevronRight, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/store'
 import { cn } from '@/lib/cn'
@@ -30,6 +30,7 @@ const ITEMS: NavItem[] = [
   { to: '/reports', label: 'Reports', icon: BarChart3, hint: 'CSV exports + sync history' },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, hint: 'Appearance, widgets, account' },
   { to: '/settings/layout', label: 'Layout editor', icon: LayoutGrid, hint: 'Edit aisles + bay counts. Sign-in required.' },
+  { to: '/about', label: 'About', icon: Info, hint: 'Version, build, quick links' },
 ]
 
 /**

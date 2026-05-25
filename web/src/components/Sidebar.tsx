@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useNavBadges } from '@/features/nav/badges'
 
 interface NavItem {
   to: string
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
 ]
 
 export function Sidebar() {
+  const badges = useNavBadges()
   return (
     <aside
       className="hidden lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:border-r lg:border-line lg:bg-surface/40 lg:p-4 lg:backdrop-blur-md"
@@ -61,36 +63,52 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              cn(
-                'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
-                isActive
-                  ? 'bg-brand/15 text-ink ring-1 ring-inset ring-brand-ring/30 shadow-[0_0_0_1px_rgb(var(--brand)/0.25)_inset]'
-                  : 'text-muted hover:bg-surface-2 hover:text-ink',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon
-                  className={cn(
-                    'h-4 w-4 transition',
-                    isActive ? 'text-brand' : 'text-muted group-hover:text-ink',
+        {NAV.map(({ to, label, icon: Icon }) => {
+          const badge =
+            to === '/alerts' ? badges.alerts : to === '/replenish' ? badges.replen : 0
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+                  isActive
+                    ? 'bg-brand/15 text-ink ring-1 ring-inset ring-brand-ring/30 shadow-[0_0_0_1px_rgb(var(--brand)/0.25)_inset]'
+                    : 'text-muted hover:bg-surface-2 hover:text-ink',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 transition',
+                      isActive ? 'text-brand' : 'text-muted group-hover:text-ink',
+                    )}
+                  />
+                  {label}
+                  {badge > 0 && (
+                    <span
+                      className={cn(
+                        'tnum ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
+                        to === '/alerts'
+                          ? 'bg-bad/20 text-bad'
+                          : 'bg-warn/20 text-warn',
+                      )}
+                    >
+                      {badge > 99 ? '99+' : badge}
+                    </span>
                   )}
-                />
-                {label}
-                {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+                  {isActive && badge === 0 && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand shadow-[0_0_8px_rgb(var(--brand))]" />
+                  )}
+                </>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
 
       <div className="mt-auto">

@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Search, Sun, Moon, RefreshCw, Settings as SettingsIcon, LogIn, LogOut, User as UserIcon } from 'lucide-react'
+import { Search, Sun, Moon, Settings as SettingsIcon, LogIn, LogOut, User as UserIcon } from 'lucide-react'
 import { Button } from './ui/Button'
 import { useTheme } from '@/store/theme'
 import { useInventory } from '@/features/inventory/store'
 import { syncNow } from '@/lib/api'
-import { timeAgo } from '@/lib/inventory'
 import { cn } from '@/lib/cn'
 import { useSearch } from '@/features/search/store'
 import { SettingsSheet } from '@/features/settings/SettingsSheet'
 import { useAuth } from '@/features/auth/store'
 import { SignInSheet } from '@/features/auth/SignInSheet'
+import { SyncIndicator } from './SyncIndicator'
 
 interface Props {
   title: string
@@ -18,7 +18,6 @@ interface Props {
 export function Topbar({ title }: Props) {
   const mode = useTheme((s) => s.mode)
   const toggleMode = useTheme((s) => s.toggleMode)
-  const generatedAt = useInventory((s) => s.inventory?.generatedAt)
   const refresh = useInventory((s) => s.refresh)
   const openSearch = useSearch((s) => s.open)
   const [syncing, setSyncing] = useState(false)
@@ -114,17 +113,7 @@ export function Topbar({ title }: Props) {
         <Search className="h-4 w-4" />
       </button>
 
-      <Button
-        variant="secondary"
-        size="md"
-        onClick={handleSync}
-        disabled={syncing}
-        className="!h-10 !w-10 !p-0"
-        title={generatedAt ? `Last sync ${timeAgo(generatedAt)}` : 'Sync now'}
-        aria-label="Sync inventory now"
-      >
-        <RefreshCw className={cn('h-4 w-4', syncing && 'animate-spin')} />
-      </Button>
+      <SyncIndicator onClick={handleSync} syncing={syncing} />
 
       <Button
         variant="ghost"

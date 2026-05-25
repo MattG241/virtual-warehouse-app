@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search as SearchIcon, X, Package, MapPin, ArrowRight } from 'lucide-react'
+import { Search as SearchIcon, X, Package, MapPin, ArrowRight, Clock } from 'lucide-react'
 import { useSearch } from './store'
 import { useInventory } from '@/features/inventory/store'
 import { cn } from '@/lib/cn'
 import { allSlots, fmtN } from '@/lib/inventory'
 import type { Inventory } from '@/lib/types'
+import { getRecent, pushRecent, clearRecent, type RecentEntry } from './recent'
 
 type Tab = 'all' | 'products' | 'locations'
 
@@ -126,8 +127,10 @@ export function SearchOverlay() {
 
   function pick(hit: Hit) {
     if (hit.kind === 'sku') {
+      pushRecent({ kind: 'sku', value: hit.sku, label: hit.name })
       navigate(`/inventory?q=${encodeURIComponent(hit.sku)}`)
     } else {
+      pushRecent({ kind: 'location', value: hit.code })
       // Parse the location code "A01.B05.L02.S3" and drill straight into
       // the aisle walk-through with the slot pre-selected.
       const aisleMatch = /^(A\d+)/.exec(hit.code)
@@ -226,7 +229,18 @@ export function SearchOverlay() {
         {/* Results */}
         <div className="flex-1 overflow-y-auto">
           {!q.trim() ? (
-            <EmptyHint />
+            <EmptyHint
+              onPick={(r) => {
+                if (r.kind === 'sku') {
+                  navigate(`/inventory?q=${encodeURIComponent(r.value)}`)
+                } else {
+                  const m = /^(A\d+)/.exec(r.value)?.[1]
+                  if (m) navigate(`/warehouse/${m}?slot=${encodeURIComponent(r.value)}`)
+                  else navigate('/warehouse')
+                }
+                close()
+              }}
+            />
           ) : flat.length === 0 ? (
             <div className="p-10 text-center text-sm text-muted">
               No matches for <strong className="text-ink">"{q}"</strong>
@@ -325,30 +339,96 @@ export function SearchOverlay() {
   )
 }
 
-function EmptyHint() {
+function EmptyHint({
+  onPick,
+}: {
+  onPick: (e: RecentEntry) => void
+}) {
+  const [recent, setRecent] = useState<RecentEntry[]>([])
+  useEffect(() => {
+    setRecent(getRecent())
+  }, [])
+
   return (
-    <div className="p-6 text-sm text-muted">
-      <p className="mb-3">Try searching by:</p>
-      <ul className="space-y-2">
-        <li className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-brand/15 text-brand">
-            <Package className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <div className="font-semibold text-ink">SKU</div>
-            <div className="text-xs">e.g. ANISBR-LBK-XS</div>
-          </div>
-        </li>
-        <li className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-brand/15 text-brand">
-            <MapPin className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <div className="font-semibold text-ink">Location</div>
-            <div className="text-xs font-mono">e.g. A01.B05.L02.S3</div>
-          </div>
-        </li>
-      </ul>
+    <div className="p-4">
+      {recent.length > 0 && (
+        <section className="mb-4">
+          <header className="mb-2 flex items-center justify-between px-1">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              <Clock className="h-3 w-3" />
+              Recent
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                clearRecent()
+                setRecent([])
+              }}
+              className="text-[11px] font-semibold text-muted hover:text-ink"
+            >
+              Clear
+            </button>
+          </header>
+          <ul className="space-y-1">
+            {recent.map((r) => (
+              <li key={`${r.kind}-${r.value}`}>
+                <button
+                  type="button"
+                  onClick={() => onPick(r)}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2"
+                >
+                  <span
+                    className={cn(
+                      'grid h-8 w-8 flex-shrink-0 place-items-center rounded-md',
+                      r.kind === 'sku' ? 'bg-brand/15 text-brand' : 'bg-warn/15 text-warn',
+                    )}
+                  >
+                    {r.kind === 'sku' ? (
+                      <Package className="h-4 w-4" />
+                    ) : (
+                      <MapPin className="h-4 w-4" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-mono text-sm font-semibold text-ink">
+                      {r.value}
+                    </div>
+                    {r.label && (
+                      <div className="truncate text-[11px] text-muted">{r.label}</div>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 flex-shrink-0 text-subtle" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section>
+        <header className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          Try searching by
+        </header>
+        <ul className="space-y-2">
+          <li className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2">
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-brand/15 text-brand">
+              <Package className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <div className="font-semibold text-ink">SKU</div>
+              <div className="text-xs text-muted">e.g. ANISBR-LBK-XS</div>
+            </div>
+          </li>
+          <li className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2">
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-brand/15 text-brand">
+              <MapPin className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <div className="font-semibold text-ink">Location</div>
+              <div className="text-xs font-mono text-muted">e.g. A01.B05.L02.S3</div>
+            </div>
+          </li>
+        </ul>
+      </section>
     </div>
   )
 }
