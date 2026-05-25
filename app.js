@@ -171,7 +171,10 @@ function saveState() {
   _layoutSaveTimer = setTimeout(() => {
     fetch('./api/layout', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Id': window.__clientId || '',
+      },
       body: JSON.stringify({ aisles: state.aisles, dataVersion: state.dataVersion || '' }),
     })
       .then((r) => {

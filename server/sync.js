@@ -1,6 +1,7 @@
 import { config } from './config.js';
 import { pool, initSchema } from './db.js';
 import { PvxClient } from './pvx.js';
+import { publish } from './events.js';
 
 let running = false;
 
@@ -24,6 +25,7 @@ export async function runSyncOnce() {
 
   const startedAt = Date.now();
   console.log(`[sync] run #${runId} started`);
+  publish('sync.started', { runId, startedAt });
 
   try {
     const pvx = new PvxClient(config.pvx);
@@ -96,6 +98,12 @@ export async function runSyncOnce() {
     console.log(
       `[sync] run #${runId} ok — ${finalRows.length} rows in ${Date.now() - startedAt}ms`,
     );
+    publish('sync.completed', {
+      runId,
+      rowCount: finalRows.length,
+      finishedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+    });
     return { runId, rowCount: finalRows.length };
   } catch (err) {
     console.error(`[sync] run #${runId} failed:`, err.message);
@@ -103,6 +111,7 @@ export async function runSyncOnce() {
       `UPDATE sync_runs SET finished_at = NOW(), status = 'error', error_text = $1 WHERE id = $2`,
       [String(err.message || err).slice(0, 2000), runId],
     );
+    publish('sync.failed', { runId, error: String(err.message || err).slice(0, 300) });
     throw err;
   } finally {
     running = false;

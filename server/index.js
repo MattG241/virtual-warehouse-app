@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { initSchema, pool } from './db.js';
 import { startSyncLoop, runSyncOnce } from './sync.js';
 import { buildWarehouseData } from './shape.js';
+import { attachSseRoute, publish } from './events.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -67,12 +68,16 @@ app.put('/api/layout', express.json({ limit: '2mb' }), async (req, res) => {
        ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
       [JSON.stringify(body)],
     );
+    const clientId = req.get('X-Client-Id') || null;
+    publish('layout.updated', { clientId, updatedAt: new Date().toISOString() });
     res.json({ ok: true });
   } catch (e) {
     console.error('[api/layout PUT] error:', e);
     res.status(500).json({ error: e.message });
   }
 });
+
+attachSseRoute(app);
 
 app.post('/api/sync-now', express.json(), async (_req, res) => {
   try {
