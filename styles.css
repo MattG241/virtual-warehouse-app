@@ -816,6 +816,69 @@ body.is-signed-out #layoutView .section-heading::after {
   color: var(--ink);
 }
 
+/* Export menu */
+.export-menu {
+  position: relative;
+}
+
+.export-menu__btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+}
+
+.export-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 280px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+}
+
+.export-menu__panel[hidden] {
+  display: none;
+}
+
+.export-menu__group-label {
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.export-menu__item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  color: var(--ink);
+  transition: background-color var(--t-fast);
+}
+
+.export-menu__item:hover {
+  background: var(--panel-sunken);
+}
+
+.export-menu__item-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.export-menu__item-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
 /* Barcode scan button + scanner modal */
 .search-field--with-results {
   display: grid;

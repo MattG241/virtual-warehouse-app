@@ -6,6 +6,7 @@ import { initSchema, pool } from './db.js';
 import { startSyncLoop, runSyncOnce } from './sync.js';
 import { buildWarehouseData } from './shape.js';
 import { attachSseRoute, publish } from './events.js';
+import { attachExportRoutes } from './export.js';
 import {
   isAllowed,
   validateEmail,
@@ -185,6 +186,7 @@ app.get('/api/audit', requireAuth, async (req, res) => {
 });
 
 attachSseRoute(app);
+attachExportRoutes(app);
 
 app.post('/api/sync-now', express.json(), async (_req, res) => {
   try {

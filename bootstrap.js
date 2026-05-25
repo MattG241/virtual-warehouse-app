@@ -39,6 +39,7 @@ await loadScript('./app.js');
 await loadScript('./sync-ui.js');
 await loadScript('./search-ui.js');
 await loadScript('./scanner-ui.js');
+await loadScript('./export-ui.js');
 
 // Register the service worker on supported browsers — opens the door to
 // "Add to home screen" and offline shell loading.
