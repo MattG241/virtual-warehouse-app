@@ -6,6 +6,10 @@ function loadScript(src) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = src;
+    // async defaults to true for dynamically-inserted scripts, which lets them
+    // execute out of order. We chain via await, but force it false anyway so
+    // each script runs to completion in document order.
+    s.async = false;
     s.onload = resolve;
     s.onerror = () => reject(new Error(`failed to load ${src}`));
     document.head.appendChild(s);
@@ -30,3 +34,4 @@ try {
 }
 
 await loadScript('./app.js');
+await loadScript('./sync-ui.js');

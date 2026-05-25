@@ -21,7 +21,7 @@ const DEFAULT_LEVELS = 7;
 const DEFAULT_SLOTS = 7;
 
 export async function buildWarehouseData() {
-  const [stockRes, syncRes] = await Promise.all([
+  const [stockRes, syncRes, layoutRes] = await Promise.all([
     pool.query(
       `SELECT item_code, item_name, stock_count, container_barcode,
               location_barcode, site_reference, location_type, item_type_group
@@ -35,7 +35,9 @@ export async function buildWarehouseData() {
         ORDER BY id DESC
         LIMIT 1`,
     ),
+    pool.query(`SELECT data FROM warehouse_layout WHERE id = 1`),
   ]);
+  const layout = layoutRes.rows[0]?.data || null;
 
   const grid = {};
   const other = [];
@@ -96,6 +98,7 @@ export async function buildWarehouseData() {
     skus,
     grid,
     other,
+    layout,
     syncStatus: lastSync
       ? {
           id: lastSync.id,

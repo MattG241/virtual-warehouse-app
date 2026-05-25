@@ -279,6 +279,64 @@ select:focus,
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.14);
 }
 
+/* Inventory editing is disabled on the live deploy — stock is read-only and
+   driven by PVX. Layout editing stays available via the Layout Builder view. */
+.dashboard-panel:has(#stockForm),
+.dashboard-panel:has(#activityLog),
+#resetDataButton {
+  display: none !important;
+}
+
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex-shrink: 0;
+}
+
+.sync-dot[data-state="idle"] {
+  background: #16a34a;
+}
+
+.sync-dot[data-state="stale"] {
+  background: #f59e0b;
+}
+
+.sync-dot[data-state="running"] {
+  background: #2f6fed;
+  animation: sync-pulse 1.2s ease-in-out infinite;
+}
+
+.sync-dot[data-state="error"] {
+  background: #dc2626;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+#syncNowButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .utility-button,
 .primary-button,
 .danger-button,

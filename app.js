@@ -142,26 +142,43 @@ function buildStateFromData() {
 }
 
 function loadState() {
+  // Server-stored layout is the source of truth across all users. localStorage
+  // is only used as an in-session backup if the server has nothing yet.
+  const remote = window.WAREHOUSE_DATA && window.WAREHOUSE_DATA.layout;
+  if (remote && Array.isArray(remote.aisles) && remote.aisles.length > 0) {
+    return remote;
+  }
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.aisles && parsed.dataVersion === (DATA.generatedAt || "")) {
-        return parsed;
-      }
+      if (parsed && parsed.aisles) return parsed;
     }
   } catch (error) {
-    console.warn("Could not load saved warehouse state", error);
+    console.warn("Could not load cached warehouse state", error);
   }
   return buildStateFromData();
 }
 
+let _layoutSaveTimer = null;
 function saveState() {
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
   } catch (error) {
-    console.warn("Could not save warehouse state", error);
+    console.warn("Could not cache warehouse state", error);
   }
+  if (_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
+  _layoutSaveTimer = setTimeout(() => {
+    fetch('./api/layout', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aisles: state.aisles, dataVersion: state.dataVersion || '' }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      })
+      .catch((err) => console.warn("Could not save layout to server", err.message));
+  }, 1000);
 }
 
 // --- Small helpers -------------------------------------------------------

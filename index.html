@@ -80,6 +80,11 @@
             <h2 id="pageTitle">Walkthrough</h2>
           </div>
           <div class="topbar-actions">
+            <div class="sync-status" id="syncStatus" title="Last successful PVX sync">
+              <span class="sync-dot" id="syncDot" data-state="idle" aria-hidden="true"></span>
+              <span class="sync-text" id="syncText">Last sync: checking&hellip;</span>
+            </div>
+            <button class="utility-button" id="syncNowButton" type="button" title="Pull a fresh snapshot from Peoplevox now">Sync now</button>
             <label class="search-field" for="globalSearch">
               <span>Search</span>
               <input id="globalSearch" type="search" placeholder="A01.B17.L05.S2, SKU, bay, product" />
