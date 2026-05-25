@@ -2,6 +2,24 @@ import { pool } from './db.js';
 
 const GRID_RE = /^A(\d+)\.B(\d+)\.L(\d+)\.S(\d+)$/i;
 
+// Physical warehouse layout — used as a baseline so the UI shows every aisle
+// and bay even when some are temporarily empty. Observed values are merged on
+// top, so a brand-new bay shows up automatically once it carries stock.
+const DEFAULT_AISLE_BAYS = {
+  '1': 13,
+  '2': 18,
+  '3': 25,
+  '4': 23,
+  '5': 22,
+  '6': 22,
+  '7': 21,
+  '8': 22,
+  '9': 22,
+  '10': 21,
+};
+const DEFAULT_LEVELS = 7;
+const DEFAULT_SLOTS = 7;
+
 export async function buildWarehouseData() {
   const [stockRes, syncRes] = await Promise.all([
     pool.query(
@@ -22,7 +40,7 @@ export async function buildWarehouseData() {
   const grid = {};
   const other = [];
   const skus = {};
-  const aisleBays = {};
+  const observedAisleBays = {};
   let maxLevel = 0;
   let maxSlot = 0;
 
@@ -41,11 +59,13 @@ export async function buildWarehouseData() {
       const level = Number(m[3]);
       const slot = Number(m[4]);
 
-      const code = `A${aisle}.B${pad2(bay)}.L${pad2(level)}.S${pad2(slot)}`;
+      // Match the frontend's canonical key: A{aa}.B{bb}.L{ll}.S{n}
+      // (aisle/bay/level zero-padded to 2 digits, slot NOT padded).
+      const code = `A${pad2(aisle)}.B${pad2(bay)}.L${pad2(level)}.S${slot}`;
       (grid[code] ||= []).push([r.item_code, r.stock_count, r.location_type || 'Pick']);
 
       const aisleKey = String(aisle);
-      aisleBays[aisleKey] = Math.max(aisleBays[aisleKey] || 0, bay);
+      observedAisleBays[aisleKey] = Math.max(observedAisleBays[aisleKey] || 0, bay);
       if (level > maxLevel) maxLevel = level;
       if (slot > maxSlot) maxSlot = slot;
     } else {
@@ -59,13 +79,20 @@ export async function buildWarehouseData() {
     }
   }
 
+  // Merge defaults with observed so empty aisles/bays still render but new
+  // physical additions are picked up automatically.
+  const aisleBays = { ...DEFAULT_AISLE_BAYS };
+  for (const [k, v] of Object.entries(observedAisleBays)) {
+    aisleBays[k] = Math.max(aisleBays[k] || 0, v);
+  }
+
   const lastSync = syncRes.rows[0];
   return {
     generatedAt: lastSync?.finished_at ? new Date(lastSync.finished_at).toISOString() : '',
     rowCount: stockRes.rowCount,
     aisleBays,
-    levels: maxLevel || 7,
-    slots: maxSlot || 7,
+    levels: Math.max(maxLevel, DEFAULT_LEVELS),
+    slots: Math.max(maxSlot, DEFAULT_SLOTS),
     skus,
     grid,
     other,
