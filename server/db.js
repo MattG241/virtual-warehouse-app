@@ -26,6 +26,12 @@ export async function initSchema() {
     -- Migration for existing installs that pre-date the item_barcode column.
     ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS item_barcode TEXT NOT NULL DEFAULT '';
 
+    CREATE TABLE IF NOT EXISTS alert_state (
+      key        TEXT PRIMARY KEY,
+      data       JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE INDEX IF NOT EXISTS stock_items_location_idx ON stock_items(location_barcode);
     CREATE INDEX IF NOT EXISTS stock_items_item_idx ON stock_items(item_code);
 

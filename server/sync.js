@@ -2,6 +2,7 @@ import { config } from './config.js';
 import { pool, initSchema } from './db.js';
 import { PvxClient } from './pvx.js';
 import { publish } from './events.js';
+import { postSyncFailure, postStockDeltas, postAisleFullness } from './alerts.js';
 
 let running = false;
 
@@ -105,6 +106,10 @@ export async function runSyncOnce() {
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
     });
+    // Fire alert checks after a successful sync. Failures inside these are
+    // logged but never rethrown — alerting must not break the sync result.
+    postStockDeltas(runId);
+    postAisleFullness(runId);
     return { runId, rowCount: finalRows.length };
   } catch (err) {
     console.error(`[sync] run #${runId} failed:`, err.message);
@@ -113,6 +118,7 @@ export async function runSyncOnce() {
       [String(err.message || err).slice(0, 2000), runId],
     );
     publish('sync.failed', { runId, error: String(err.message || err).slice(0, 300) });
+    postSyncFailure(runId, String(err.message || err));
     throw err;
   } finally {
     running = false;

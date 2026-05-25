@@ -72,6 +72,30 @@ Add these to Railway → service → **Variables**:
 
 That's it — no external email service required. Passwords are hashed with scrypt (Node built-in) and stored in the `users` table. Anyone whose email is in `ALLOWED_EMAILS` can hit **Sign in → Create one** on first visit, pick a password, and they're in. Subsequent visits use email + password.
 
+### Slack alerts (optional)
+
+Create an Incoming Webhook in your Slack workspace (Apps → Incoming Webhooks → Add to Slack → pick a channel). Drop the URL into Railway:
+
+```
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../...
+LOW_AISLE_THRESHOLD_PCT=10
+```
+
+What fires:
+
+- **Sync failure** — immediate alert with the error text
+- **New zero-stock SKUs** — after every successful sync, posts the SKUs that just hit zero (sample of 25, count of more)
+- **Stock recovery** — small recoveries (≤ 5 SKUs) get a check-mark message; large recoveries are skipped to avoid noise
+- **Aisle below threshold** — aisles whose stocked-slot percentage drops below `LOW_AISLE_THRESHOLD_PCT`
+
+Test the wiring:
+
+```
+curl -X POST https://your-app.up.railway.app/api/alerts/test
+```
+
+If `SLACK_WEBHOOK_URL` is unset, the alerts log to the server console instead so you can see what would have posted.
+
 ### Operational endpoints
 
 - `GET /api/health` — DB ping.
