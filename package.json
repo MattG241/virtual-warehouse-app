@@ -10,7 +10,12 @@
   "scripts": {
     "start": "node server/index.js",
     "sync:once": "node server/sync.js --once",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "web:install": "npm --prefix web ci || npm --prefix web install",
+    "web:build": "npm --prefix web run build",
+    "web:dev": "npm --prefix web run dev",
+    "build": "npm run web:install && npm run web:build",
+    "postinstall": "npm run web:install"
   },
   "dependencies": {
     "express": "^4.21.1",

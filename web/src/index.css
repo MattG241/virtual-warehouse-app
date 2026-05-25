@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Design tokens. Defined as space-separated RGB triplets so Tailwind can apply
+   alpha via `rgb(var(--x) / <alpha>)`. Light + dark variants below.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Light (default) — kept utilitarian, app launches in dark by default */
+  --bg: 244 246 250;
+  --surface: 255 255 255;
+  --surface-2: 248 250 252;
+  --surface-3: 241 245 249;
+  --line: 226 232 240;
+  --line-strong: 203 213 225;
+  --ink: 15 23 42;
+  --muted: 100 116 139;
+  --subtle: 148 163 184;
+
+  --brand: 37 99 235;
+  --brand-2: 14 165 233;
+  --brand-soft: 219 234 254;
+  --brand-ring: 147 197 253;
+
+  --good: 22 163 74;
+  --warn: 245 158 11;
+  --bad: 220 38 38;
+}
+
+.dark {
+  /* Deep navy command-centre palette inspired by the mockups */
+  --bg: 7 11 20;
+  --surface: 17 23 42;
+  --surface-2: 22 30 52;
+  --surface-3: 30 41 66;
+  --line: 38 48 72;
+  --line-strong: 56 70 100;
+  --ink: 226 232 240;
+  --muted: 148 163 184;
+  --subtle: 100 116 139;
+
+  --brand: 56 130 246;
+  --brand-2: 14 165 233;
+  --brand-soft: 30 64 122;
+  --brand-ring: 96 165 250;
+
+  --good: 34 197 94;
+  --warn: 245 158 11;
+  --bad: 248 113 113;
+}
+
+/* Accent overrides (set on <html data-accent="…"> by ThemeStore) */
+.dark[data-accent='violet'] { --brand: 139 92 246; --brand-2: 168 85 247; --brand-ring: 196 181 253; }
+.dark[data-accent='emerald'] { --brand: 16 185 129; --brand-2: 34 197 94; --brand-ring: 110 231 183; }
+.dark[data-accent='amber']   { --brand: 245 158 11; --brand-2: 234 179 8;  --brand-ring: 252 211 77; }
+.dark[data-accent='rose']    { --brand: 244 63 94;  --brand-2: 251 113 133;--brand-ring: 251 207 232; }
+[data-accent='violet'] { --brand: 124 58 237; --brand-2: 147 51 234; --brand-ring: 196 181 253; }
+[data-accent='emerald'] { --brand: 5 150 105; --brand-2: 16 185 129; --brand-ring: 110 231 183; }
+[data-accent='amber']   { --brand: 217 119 6;  --brand-2: 234 179 8;  --brand-ring: 252 211 77; }
+[data-accent='rose']    { --brand: 225 29 72;  --brand-2: 244 63 94;  --brand-ring: 251 207 232; }
+
+html, body, #root { height: 100%; }
+
+body {
+  @apply bg-bg text-ink antialiased;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Backdrop "stars" / depth — subtle radial gradient in dark mode */
+.dark body {
+  background-image:
+    radial-gradient(1200px 600px at 12% -10%, rgb(56 130 246 / 0.10), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgb(14 165 233 / 0.08), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Focus ring that respects the brand colour */
+*:focus-visible {
+  outline: 2px solid rgb(var(--brand-ring) / 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Glass card utility — used by Card.tsx default variant */
+.glass {
+  background:
+    linear-gradient(180deg, rgb(var(--surface) / 0.85), rgb(var(--surface-2) / 0.85));
+  border: 1px solid rgb(var(--line) / 1);
+  backdrop-filter: blur(10px);
+}
+
+/* Scrollbar polish (webkit only) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--line-strong) / 0.7); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--line-strong) / 1); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Numbers tabular */
+.tnum { font-variant-numeric: tabular-nums; }

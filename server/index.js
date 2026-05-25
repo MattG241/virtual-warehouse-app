@@ -199,27 +199,94 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
   }
 });
 
-// Serve the existing static frontend (index.html, app.js, styles.css, bootstrap.js).
-// inventory.js is still served, but bootstrap.js overrides window.WAREHOUSE_DATA
-// from the API before app.js runs.
-app.use(
-  express.static(projectRoot, {
-    extensions: ['html'],
-    setHeaders(res, filePath) {
-      if (filePath.endsWith('.html') || filePath.endsWith('bootstrap.js')) {
-        res.setHeader('Cache-Control', 'no-cache');
-      }
-    },
-  }),
-);
+// Serve the React build from web/dist in production. The build hashes asset
+// filenames, so we can cache aggressively except for index.html (no-cache so
+// new deploys roll out immediately).
+import fs from 'node:fs';
+const webDist = path.join(projectRoot, 'web', 'dist');
+const hasWebBuild = fs.existsSync(path.join(webDist, 'index.html'));
+
+if (hasWebBuild) {
+  app.use(
+    express.static(webDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (/\.(?:js|css|woff2?|png|svg|jpg|jpeg|webp|ico)$/.test(filePath)) {
+          // Hashed asset filenames — safe to cache for a year
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    }),
+  );
+  // SPA fallback: any non-API GET falls through to index.html so client-side
+  // routing works on hard refresh.
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(webDist, 'index.html'));
+  });
+} else {
+  // Dev / unbuilt: fall back to the legacy static SPA at the repo root.
+  console.warn(
+    '[server] web/dist not found — serving legacy static SPA. Run `npm run build` in /web to use the React UI.',
+  );
+  app.use(
+    express.static(projectRoot, {
+      extensions: ['html'],
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html') || filePath.endsWith('bootstrap.js')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }),
+  );
+}
+
+let httpServer;
 
 async function main() {
   await initSchema();
   startSyncLoop();
-  app.listen(config.port, () => {
+  httpServer = app.listen(config.port, () => {
     console.log(`[server] listening on http://localhost:${config.port}`);
   });
 }
+
+// Graceful shutdown — Railway sends SIGTERM on deploy/restart. Drain the
+// HTTP server and close the pg pool so in-flight requests finish cleanly.
+function shutdown(signal) {
+  console.log(`[server] received ${signal}, draining…`);
+  let exited = false;
+  const force = setTimeout(() => {
+    if (!exited) {
+      console.warn('[server] shutdown timeout — forcing exit');
+      process.exit(1);
+    }
+  }, 10_000).unref();
+
+  Promise.resolve()
+    .then(() => new Promise((resolve) => (httpServer ? httpServer.close(resolve) : resolve())))
+    .then(() => pool.end())
+    .then(() => {
+      exited = true;
+      clearTimeout(force);
+      process.exit(0);
+    })
+    .catch((e) => {
+      console.error('[server] shutdown error:', e);
+      process.exit(1);
+    });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] unhandledRejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[server] uncaughtException:', err);
+});
 
 main().catch((e) => {
   console.error('[server] fatal:', e);
