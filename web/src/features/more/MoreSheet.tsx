@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   X, PackageSearch, Bell, BarChart3, LayoutGrid, ScanLine,
   ArrowDownToLine, Settings as SettingsIcon, LogIn, LogOut,
-  Route as RouteIcon, Info, ChevronRight, type LucideIcon,
+  Route as RouteIcon, Info, Box, ChevronRight, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/store'
 import { cn } from '@/lib/cn'
@@ -24,6 +24,7 @@ interface NavItem {
 // Everything not on the bottom tab bar gets a home here. Listed in
 // rough "frequency of use" order on the floor.
 const ITEMS: NavItem[] = [
+  { to: '/heatmap', label: '3D heatmap', icon: Box, hint: 'Isometric warehouse view, every box colour-coded' },
   { to: '/pick', label: 'Pick route', icon: RouteIcon, hint: 'Build an optimised walk for a SKU list' },
   { to: '/inventory', label: 'Inventory', icon: PackageSearch, hint: 'Catalogue search + per-SKU detail' },
   { to: '/alerts', label: 'Alerts', icon: Bell, hint: 'Critical, low, zero stock + sync failures' },
