@@ -1,9 +1,14 @@
-// Isometric 3D warehouse heatmap — every aisle, bay, level, slot
-// rendered as a colour-coded box. Click a box for the details panel;
-// click an aisle floor pad to drill into the rack walk-through.
+// Isometric 3D warehouse heatmap — every BAY-LEVEL of every aisle is
+// rendered as a colour-coded block. Each block aggregates the slots at
+// that bay-level (typically 7 slots) and uses the worst non-empty status,
+// so a single critical slot makes the whole block flash red. On a phone
+// 10k slot-sized boxes were <2px each and indistinguishable; ~1.5k
+// bay-level blocks are 12–14px each and actually communicate state.
 //
-// Performance: ~10k boxes → uses instanced meshes (one draw call per
-// status colour) instead of one mesh per box. Holds 60fps on a phone.
+// Click a block → bay-level summary panel + Walk button to drill into
+// the rack view. Click an aisle floor pad → straight into the aisle.
+//
+// Performance: instanced meshes, one per status colour (≤4 draw calls).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,65 +20,104 @@ import {
 } from 'lucide-react'
 import { useInventory } from '@/features/inventory/store'
 import { allSlots, fmtN } from '@/lib/inventory'
-import type { SlotSummary } from '@/lib/types'
-import { cn } from '@/lib/cn'
+import type { SlotSummary, Status } from '@/lib/types'
 
-// Spacing constants (world units = arbitrary; tuned to look good)
-const SLOT_W = 0.55
-const SLOT_H = 0.45
-const SLOT_D = 0.45
-const LEVEL_GAP = 0.03   // vertical gap between shelves
-const SLOT_GAP = 0.05    // horizontal gap between adjacent slots on a shelf
-const BAY_GAP = 0.20     // gap between bays in the same aisle
-const AISLE_GAP = 2.5    // walkway gap between adjacent aisle blocks
+// Spacing constants (world units). A "block" is one bay-level — square
+// enough to read on a phone, tall enough that level segments stack
+// visibly into a tower per bay.
+const BAY_W = 1.0       // X: bay width
+const LEVEL_H = 0.6     // Y: single level height
+const BAY_D = 0.85      // Z: block depth (≈ one bay deep)
+const LEVEL_GAP = 0.04
+const BAY_GAP = 0.15    // between adjacent bays in the same aisle
+const AISLE_GAP = 1.8   // walkway between adjacent aisles
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR: Record<Status, string> = {
   empty: '#1b3a5b',     // muted blue
   critical: '#dc2626',  // red
   low: '#f59e0b',       // orange
   healthy: '#22c55e',   // green
 }
 
-interface SlotPos {
-  slot: SlotSummary
+const STATUS_RANK: Record<Status, number> = {
+  critical: 3, low: 2, healthy: 1, empty: 0,
+}
+
+interface BayBlock {
+  code: string   // A01.B05.L03 — bay-level (no slot)
+  aisle: string  // A01
+  bay: string    // B05
+  level: string  // L03
+  bayIdx: number   // 0-indexed (B05 → 4)
+  levelIdx: number // 0-indexed (L03 → 2)
+  status: Status
+  totalUnits: number
+  slotCount: number    // # of physical slots aggregated into this block
+  emptyCount: number   // # of those slots that are empty
+  topSku: { sku: string; name: string; qty: number } | null
+}
+
+function aggregateBayLevels(slots: SlotSummary[]): BayBlock[] {
+  const map = new Map<string, BayBlock>()
+  for (const s of slots) {
+    const code = `${s.aisle}.${s.bay}.${s.level}`
+    let b = map.get(code)
+    if (!b) {
+      b = {
+        code,
+        aisle: s.aisle,
+        bay: s.bay,
+        level: s.level,
+        bayIdx: parseInt(s.bay.slice(1), 10) - 1,
+        levelIdx: parseInt(s.level.slice(1), 10) - 1,
+        status: 'empty',
+        totalUnits: 0,
+        slotCount: 0,
+        emptyCount: 0,
+        topSku: null,
+      }
+      map.set(code, b)
+    }
+    b.totalUnits += s.totalUnits
+    b.slotCount += 1
+    if (s.status === 'empty') b.emptyCount += 1
+    if (STATUS_RANK[s.status] > STATUS_RANK[b.status]) b.status = s.status
+    const heaviest = s.skus.reduce<{ sku: string; name: string; qty: number } | null>(
+      (acc, x) => (acc && acc.qty >= x.qty ? acc : { sku: x.sku, name: x.name, qty: x.qty }),
+      null,
+    )
+    if (heaviest && (!b.topSku || heaviest.qty > b.topSku.qty)) b.topSku = heaviest
+  }
+  return Array.from(map.values())
+}
+
+interface BlockPos {
+  block: BayBlock
   x: number
   y: number
   z: number
 }
 
-function layoutSlots(slots: SlotSummary[]): SlotPos[] {
-  // Compute the bay count per aisle so we can centre each aisle row.
+function layoutBayLevels(blocks: BayBlock[]): BlockPos[] {
   const baysPerAisle = new Map<string, number>()
-  const slotsPerBay = new Map<string, number>() // bay code → max slot index
-  for (const s of slots) {
-    const bayNum = parseInt(s.bay.slice(1), 10)
-    baysPerAisle.set(s.aisle, Math.max(baysPerAisle.get(s.aisle) || 0, bayNum))
-    const key = `${s.aisle}.${s.bay}`
-    const slotNum = parseInt(s.slot.slice(1), 10)
-    slotsPerBay.set(key, Math.max(slotsPerBay.get(key) || 0, slotNum))
+  for (const b of blocks) {
+    baysPerAisle.set(b.aisle, Math.max(baysPerAisle.get(b.aisle) || 0, b.bayIdx + 1))
   }
   const aisleIds = [...baysPerAisle.keys()].sort()
+  const bayStep = BAY_W + BAY_GAP
+  const levelStep = LEVEL_H + LEVEL_GAP
+  const aisleStep = BAY_D + AISLE_GAP
 
-  // Sum bay widths per aisle for centring
-  const bayWidth = SLOT_W * 7 + SLOT_GAP * 6 + BAY_GAP // assume 7 slots per bay, fall back below
-
-  const out: SlotPos[] = []
-  for (const slot of slots) {
-    const aisleIdx = aisleIds.indexOf(slot.aisle)
+  const out: BlockPos[] = []
+  for (const block of blocks) {
+    const aisleIdx = aisleIds.indexOf(block.aisle)
     if (aisleIdx === -1) continue
-    const bayNum = parseInt(slot.bay.slice(1), 10) - 1
-    const slotNum = parseInt(slot.slot.slice(1), 10) - 1
-    const levelNum = parseInt(slot.level.slice(1), 10) - 1
-    const bayCount = baysPerAisle.get(slot.aisle) || 1
-
-    // Centre the aisle's bays around X=0
-    const aisleHalfWidth = (bayCount * bayWidth - BAY_GAP) / 2
-    const x = bayNum * bayWidth - aisleHalfWidth + slotNum * (SLOT_W + SLOT_GAP)
-    const y = levelNum * (SLOT_H + LEVEL_GAP) + SLOT_H / 2
-    // Each aisle pushed back in Z
-    const z = aisleIdx * AISLE_GAP
-
-    out.push({ slot, x, y, z })
+    const bayCount = baysPerAisle.get(block.aisle) || 1
+    const aisleHalfWidth = (bayCount * bayStep - BAY_GAP) / 2
+    const x = block.bayIdx * bayStep - aisleHalfWidth + BAY_W / 2
+    const y = block.levelIdx * levelStep + LEVEL_H / 2
+    const z = aisleIdx * aisleStep
+    out.push({ block, x, y, z })
   }
   return out
 }
@@ -85,15 +129,24 @@ interface Props {
 export function Warehouse3D({ onClose }: Props) {
   const inv = useInventory((s) => s.inventory)
   const navigate = useNavigate()
-  const [selected, setSelected] = useState<SlotSummary | null>(null)
+  const [selected, setSelected] = useState<BayBlock | null>(null)
   const [hideEmpty, setHideEmpty] = useState(false)
   const controlsRef = useRef<{ reset: () => void } | null>(null)
 
-  const positions = useMemo(() => (inv ? layoutSlots(allSlots(inv)) : []), [inv])
+  const blocks = useMemo(() => (inv ? aggregateBayLevels(allSlots(inv)) : []), [inv])
+  const positions = useMemo(() => layoutBayLevels(blocks), [blocks])
   const visible = useMemo(
-    () => (hideEmpty ? positions.filter((p) => p.slot.status !== 'empty') : positions),
+    () => (hideEmpty ? positions.filter((p) => p.block.status !== 'empty') : positions),
     [positions, hideEmpty],
   )
+
+  // Aggregate counts for the legend chip so the user sees how many of
+  // each status they're looking at — far more useful than just colour keys.
+  const statusCounts = useMemo(() => {
+    const c: Record<Status, number> = { healthy: 0, low: 0, critical: 0, empty: 0 }
+    for (const p of positions) c[p.block.status]++
+    return c
+  }, [positions])
 
   // Compute scene bounds for an isometric camera that frames the whole warehouse
   const bounds = useMemo(() => {
@@ -117,9 +170,12 @@ export function Warehouse3D({ onClose }: Props) {
 
   const aisleIds = useMemo(() => {
     const set = new Set<string>()
-    for (const p of positions) set.add(p.slot.aisle)
+    for (const p of positions) set.add(p.block.aisle)
     return [...set].sort()
   }, [positions])
+
+  // Label fontSize scales with scene so aisle/bay labels stay readable.
+  const labelSize = Math.max(0.5, bounds.size * 0.028)
 
   // WebGL feature-detect — some embedded webviews / very old browsers
   // can't run Three.js. Render a graceful fallback instead of a black
@@ -171,11 +227,11 @@ export function Warehouse3D({ onClose }: Props) {
           enableRotate
           enableZoom
           minZoom={0.3}
-          maxZoom={3}
+          maxZoom={5}
           target={bounds.centre}
           dampingFactor={0.12}
         />
-        <ambientLight intensity={0.6} />
+        <ambientLight intensity={0.65} />
         <directionalLight position={[5, 10, 5]} intensity={0.9} />
         <directionalLight position={[-5, 7, -3]} intensity={0.3} color="#88aaff" />
 
@@ -188,11 +244,15 @@ export function Warehouse3D({ onClose }: Props) {
             key={aisle}
             aisle={aisle}
             positions={positions}
+            labelSize={labelSize}
             onClick={() => navigate(`/warehouse/${aisle}`)}
           />
         ))}
 
-        {/* Instanced box meshes — one per status */}
+        {/* Bay number markers (every 5 bays) for orientation */}
+        <BayMarkers positions={positions} labelSize={labelSize * 0.55} />
+
+        {/* Instanced bay-level blocks — one mesh per status colour */}
         <Boxes
           positions={visible}
           selectedCode={selected?.code || null}
@@ -204,25 +264,21 @@ export function Warehouse3D({ onClose }: Props) {
       <div className="pointer-events-none absolute inset-0 flex flex-col">
         {/* Top bar */}
         <div className="pointer-events-auto flex items-start justify-between gap-2 p-3">
-          <div className="flex flex-wrap gap-1.5 rounded-full bg-bg/80 px-2.5 py-1.5 text-[11px] font-semibold ring-1 ring-line backdrop-blur-md">
-            <LegendDot tone="healthy" label="Stocked" />
-            <LegendDot tone="low" label="Low" />
-            <LegendDot tone="critical" label="Critical" />
-            <LegendDot tone="empty" label="Empty" />
+          <div className="flex flex-wrap gap-1.5 rounded-full bg-bg/85 px-2.5 py-1.5 text-[11px] font-semibold ring-1 ring-line backdrop-blur-md">
+            <LegendDot tone="healthy" label="Stocked" count={statusCounts.healthy} />
+            <LegendDot tone="low" label="Low" count={statusCounts.low} />
+            <LegendDot tone="critical" label="Critical" count={statusCounts.critical} />
+            <LegendDot tone="empty" label="Empty" count={statusCounts.empty} />
           </div>
           <div className="flex gap-1.5">
             <CanvasButton
-              title={hideEmpty ? 'Show empty boxes' : 'Hide empty boxes'}
+              title={hideEmpty ? 'Show empty blocks' : 'Hide empty blocks'}
               onClick={() => setHideEmpty((v) => !v)}
               icon={hideEmpty ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             />
             <CanvasButton
               title="Reset camera"
               onClick={() => {
-                // Force a remount of OrbitControls by toggling a key isn't
-                // trivial here — instead jiggle the target to its initial.
-                // The OrbitControls reset() is internal; the simplest reliable
-                // path is to reload the page-state for this view.
                 if (controlsRef.current && typeof controlsRef.current.reset === 'function') {
                   controlsRef.current.reset()
                 }
@@ -239,32 +295,33 @@ export function Warehouse3D({ onClose }: Props) {
           </div>
         </div>
 
-        {/* Selected slot panel — floats over the canvas bottom */}
-        {selected && (
+        {/* Selected bay-level panel — floats over the canvas bottom */}
+        {selected ? (
           <div className="pointer-events-auto mx-auto mt-auto mb-3 w-[calc(100%-1.5rem)] max-w-sm rounded-2xl border border-line bg-surface/95 p-3 shadow-pop backdrop-blur-md animate-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-center gap-3">
               <span
-                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg font-mono text-xs font-bold"
+                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg font-mono text-[10px] font-bold leading-tight"
                 style={{
                   background: `${STATUS_COLOR[selected.status]}22`,
                   color: STATUS_COLOR[selected.status],
                 }}
               >
-                {selected.totalUnits}
+                {fmtN(selected.totalUnits)}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="font-mono text-sm font-bold text-ink">{selected.code}</div>
                 <div className="truncate text-[11px] text-muted">
-                  {selected.skus[0]
-                    ? `${selected.skus[0].sku} · ${selected.skus[0].name || '—'}`
-                    : 'Empty box'}
+                  {selected.slotCount - selected.emptyCount} / {selected.slotCount} slots filled
+                  {selected.topSku ? ` · top SKU ${selected.topSku.sku}` : ''}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() =>
                   navigate(
-                    `/warehouse/${selected.aisle}?slot=${encodeURIComponent(selected.code)}`,
+                    `/warehouse/${selected.aisle}?slot=${encodeURIComponent(
+                      `${selected.code}.S1`,
+                    )}`,
                   )
                 }
                 className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow hover:opacity-95"
@@ -281,6 +338,10 @@ export function Warehouse3D({ onClose }: Props) {
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
+          </div>
+        ) : (
+          <div className="pointer-events-none mx-auto mt-auto mb-3 rounded-full bg-bg/70 px-3 py-1 text-[11px] text-muted ring-1 ring-line backdrop-blur-md">
+            Tap a block for bay detail · drag to rotate · pinch to zoom
           </div>
         )}
       </div>
@@ -299,23 +360,24 @@ function SceneCamera({
   centre: [number, number, number]
   size: number
 }) {
-  // Isometric position — 45° azimuth, ~30° elevation
+  // Isometric position — 45° azimuth, ~38° elevation (slightly higher
+  // than classic 30° so the whole warehouse footprint stays readable
+  // from above on a phone).
   const distance = size * 1.4
   const pos: [number, number, number] = [
     centre[0] + distance,
-    centre[1] + distance * 0.8,
+    centre[1] + distance * 1.1,
     centre[2] + distance,
   ]
-  // Near/far must scale with the scene — the camera is `distance` units from
-  // the target along an isometric vector (~1.7× `distance` in length), so a
-  // big warehouse can sit hundreds of world units in front of the lens. Fixed
-  // small values clipped the entire scene to a blank canvas on real data.
+  // Near/far must scale with the scene — at isometric distance, the
+  // target sits ~1.7× `distance` from the lens, so fixed values clipped
+  // every block on real warehouses.
   const depth = Math.max(500, size * 5)
-  // Cap zoom for tiny scenes (so a 1-aisle test warehouse doesn't fill the
-  // viewport at 360×); for large scenes we want to *decrease* zoom so the
-  // whole warehouse frames in initial view. The previous Math.max floor of 20
-  // forced large warehouses to render zoomed into a single bay.
-  const zoom = Math.min(40, 360 / Math.max(size, 1))
+  // Zoom: fit the longest scene axis with ~10% padding. Floor at 2
+  // (zoomed-way-out) for huge warehouses, ceiling at 40 so a tiny test
+  // scene doesn't blow up to 360×.
+  const safeSize = Math.max(size, 1)
+  const zoom = Math.max(2, Math.min(40, 320 / safeSize))
   return (
     <OrthographicCamera
       makeDefault
@@ -349,20 +411,24 @@ function Floor({
 function AislePad({
   aisle,
   positions,
+  labelSize,
   onClick,
 }: {
   aisle: string
-  positions: SlotPos[]
+  positions: BlockPos[]
+  labelSize: number
   onClick: () => void
 }) {
-  const inAisle = positions.filter((p) => p.slot.aisle === aisle)
+  const inAisle = positions.filter((p) => p.block.aisle === aisle)
   if (inAisle.length === 0) return null
-  let minX = Infinity, maxX = -Infinity, z = inAisle[0].z
+  let minX = Infinity, maxX = -Infinity
+  const z = inAisle[0].z
   for (const p of inAisle) {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
   }
   const cx = (minX + maxX) / 2
-  const width = maxX - minX + 1
+  const width = maxX - minX + BAY_W
+  const padDepth = BAY_D + 0.6
   return (
     <group>
       {/* Floor pad */}
@@ -381,22 +447,68 @@ function AislePad({
           ;(document.body.style as { cursor: string }).cursor = 'auto'
         }}
       >
-        <planeGeometry args={[width + 0.6, 1.4]} />
-        <meshStandardMaterial color="#1e3a8a" transparent opacity={0.18} />
+        <planeGeometry args={[width + 0.4, padDepth]} />
+        <meshStandardMaterial color="#1e3a8a" transparent opacity={0.28} />
       </mesh>
-      {/* Aisle label */}
+      {/* Aisle label below the pad — bigger so it's actually readable
+       *  at full-warehouse zoom on a phone. */}
       <Text
-        position={[cx, 0.05, z - 1.0]}
+        position={[cx, 0.05, z + padDepth * 0.55]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.55}
-        color="#93c5fd"
+        fontSize={labelSize}
+        color="#bfdbfe"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.02}
+        outlineWidth={labelSize * 0.05}
         outlineColor="#0b1220"
       >
         {aisle}
       </Text>
+    </group>
+  )
+}
+
+function BayMarkers({
+  positions,
+  labelSize,
+}: {
+  positions: BlockPos[]
+  labelSize: number
+}) {
+  // One small label every 5 bays (and at bay 1) on the front-most aisle,
+  // for orientation. Avoids text spam at every bay while keeping the
+  // X-axis interpretable.
+  const markers = useMemo(() => {
+    const minZ = positions.reduce((m, p) => Math.min(m, p.z), Infinity)
+    const front = positions.filter((p) => p.z === minZ && p.block.levelIdx === 0)
+    const seen = new Set<number>()
+    const out: { x: number; z: number; label: string }[] = []
+    for (const p of front) {
+      const idx = p.block.bayIdx
+      if (idx !== 0 && (idx + 1) % 5 !== 0) continue
+      if (seen.has(idx)) continue
+      seen.add(idx)
+      out.push({ x: p.x, z: p.z - BAY_D * 0.6, label: p.block.bay })
+    }
+    return out
+  }, [positions])
+
+  if (markers.length === 0) return null
+  return (
+    <group>
+      {markers.map((m) => (
+        <Text
+          key={`${m.x}-${m.label}`}
+          position={[m.x, 0.04, m.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={labelSize}
+          color="#7c8aa1"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {m.label}
+        </Text>
+      ))}
     </group>
   )
 }
@@ -406,27 +518,25 @@ function Boxes({
   selectedCode,
   onSelect,
 }: {
-  positions: SlotPos[]
+  positions: BlockPos[]
   selectedCode: string | null
-  onSelect: (s: SlotSummary | null) => void
+  onSelect: (b: BayBlock | null) => void
 }) {
   // Group positions by status so each group gets one InstancedMesh +
-  // one material. This keeps draw calls to ~4 regardless of box count.
+  // one material. This keeps draw calls to ~4 regardless of block count.
   const groups = useMemo(() => {
-    const out: Record<string, SlotPos[]> = { healthy: [], low: [], critical: [], empty: [] }
-    for (const p of positions) {
-      out[p.slot.status]?.push(p)
-    }
+    const out: Record<Status, BlockPos[]> = { healthy: [], low: [], critical: [], empty: [] }
+    for (const p of positions) out[p.block.status]?.push(p)
     return out
   }, [positions])
 
   return (
     <group>
-      {Object.entries(groups).map(([status, list]) =>
+      {(Object.entries(groups) as [Status, BlockPos[]][]).map(([status, list]) =>
         list.length > 0 ? (
           <InstancedBoxes
             key={status}
-            status={status as 'healthy' | 'low' | 'critical' | 'empty'}
+            status={status}
             positions={list}
             selectedCode={selectedCode}
             onSelect={onSelect}
@@ -443,10 +553,10 @@ function InstancedBoxes({
   selectedCode,
   onSelect,
 }: {
-  status: 'healthy' | 'low' | 'critical' | 'empty'
-  positions: SlotPos[]
+  status: Status
+  positions: BlockPos[]
   selectedCode: string | null
-  onSelect: (s: SlotSummary | null) => void
+  onSelect: (b: BayBlock | null) => void
 }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
@@ -458,8 +568,8 @@ function InstancedBoxes({
     for (let i = 0; i < positions.length; i++) {
       const p = positions[i]
       dummy.position.set(p.x, p.y, p.z)
-      const isSelected = p.slot.code === selectedCode
-      const scale = isSelected ? 1.25 : 1
+      const isSelected = p.block.code === selectedCode
+      const scale = isSelected ? 1.2 : 1
       dummy.scale.set(scale, scale, scale)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
@@ -467,15 +577,15 @@ function InstancedBoxes({
     mesh.instanceMatrix.needsUpdate = true
   }, [positions, dummy, selectedCode])
 
-  // Pulse selected box
+  // Pulse the selected block
   useFrame((state) => {
     if (!ref.current || !selectedCode) return
-    const t = state.clock.elapsedTime * 4
-    const idx = positions.findIndex((p) => p.slot.code === selectedCode)
+    const idx = positions.findIndex((p) => p.block.code === selectedCode)
     if (idx < 0) return
     const p = positions[idx]
+    const t = state.clock.elapsedTime * 4
     dummy.position.set(p.x, p.y, p.z)
-    const scale = 1.25 + Math.sin(t) * 0.08
+    const scale = 1.2 + Math.sin(t) * 0.08
     dummy.scale.set(scale, scale, scale)
     dummy.updateMatrix()
     ref.current.setMatrixAt(idx, dummy.matrix)
@@ -490,7 +600,7 @@ function InstancedBoxes({
         e.stopPropagation()
         const idx = e.instanceId
         if (idx == null) return
-        onSelect(positions[idx]?.slot ?? null)
+        onSelect(positions[idx]?.block ?? null)
       }}
       onPointerOver={(e) => {
         e.stopPropagation()
@@ -500,15 +610,15 @@ function InstancedBoxes({
         ;(document.body.style as { cursor: string }).cursor = 'auto'
       }}
     >
-      <boxGeometry args={[SLOT_W, SLOT_H, SLOT_D]} />
+      <boxGeometry args={[BAY_W, LEVEL_H, BAY_D]} />
       <meshStandardMaterial
         color={colour}
         transparent={status === 'empty'}
-        opacity={status === 'empty' ? 0.35 : 1}
+        opacity={status === 'empty' ? 0.32 : 1}
         roughness={0.6}
         metalness={0.1}
         emissive={colour}
-        emissiveIntensity={status === 'critical' ? 0.25 : 0.05}
+        emissiveIntensity={status === 'critical' ? 0.3 : 0.05}
       />
     </instancedMesh>
   )
@@ -517,9 +627,11 @@ function InstancedBoxes({
 function LegendDot({
   tone,
   label,
+  count,
 }: {
-  tone: 'healthy' | 'low' | 'critical' | 'empty'
+  tone: Status
   label: string
+  count: number
 }) {
   return (
     <span className="inline-flex items-center gap-1 px-1.5">
@@ -528,6 +640,7 @@ function LegendDot({
         style={{ background: STATUS_COLOR[tone] }}
       />
       <span className="text-ink">{label}</span>
+      <span className="text-muted tabular-nums">{fmtN(count)}</span>
     </span>
   )
 }
