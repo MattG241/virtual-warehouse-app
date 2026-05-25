@@ -148,9 +148,14 @@ function PullView({ query }: { query: string }) {
     <ul className="space-y-2">
       {filtered.slice(0, 100).map((s) => (
         <PullCard key={s.target.code} suggestion={s} onJump={(code) => {
-          // Jump to the source location in the warehouse view
+          // Jump to the source location in the warehouse view with the
+          // exact source slot pre-selected so the picker sees which box
+          // to pull from — not just the aisle.
           const aisle = /^A0*(\d+)/.exec(code)?.[1]
-          if (aisle) navigate(`/warehouse/A${String(aisle).padStart(2, '0')}`)
+          if (aisle) {
+            const aisleId = `A${String(aisle).padStart(2, '0')}`
+            navigate(`/warehouse/${aisleId}?slot=${encodeURIComponent(code)}`)
+          }
         }} />
       ))}
       {filtered.length > 100 && (
@@ -340,7 +345,11 @@ function PutAwayView({ query }: { query: string }) {
                 <button
                   key={s.code}
                   type="button"
-                  onClick={() => navigate(`/warehouse/${g.aisle}`)}
+                  onClick={() =>
+                    navigate(
+                      `/warehouse/${g.aisle}?slot=${encodeURIComponent(s.code)}`,
+                    )
+                  }
                   title={s.code}
                   className="group flex flex-col items-start gap-1 rounded-lg border border-info/20 bg-info/10 p-2 text-left transition hover:border-info/40 hover:bg-info/15"
                 >

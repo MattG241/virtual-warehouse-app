@@ -145,7 +145,11 @@ function LowStockWidget() {
               <li key={slot.code}>
                 <button
                   type="button"
-                  onClick={() => navigate(`/warehouse/${slot.aisle}`)}
+                  onClick={() =>
+                    navigate(
+                      `/warehouse/${slot.aisle}?slot=${encodeURIComponent(slot.code)}`,
+                    )
+                  }
                   className="group flex w-full items-center gap-3 rounded-lg border border-line bg-surface-2/40 px-3 py-2.5 text-left transition hover:border-brand-ring/40 hover:bg-surface-2"
                 >
                   <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-warn/15 text-warn">
