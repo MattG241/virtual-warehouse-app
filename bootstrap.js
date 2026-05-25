@@ -35,3 +35,4 @@ try {
 
 await loadScript('./app.js');
 await loadScript('./sync-ui.js');
+await loadScript('./search-ui.js');

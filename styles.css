@@ -381,6 +381,183 @@ select:focus,
   box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.14);
 }
 
+/* Search results dropdown + heatmap overlay */
+.search-field--with-results {
+  position: relative;
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  min-width: 280px;
+}
+
+.search-results[hidden] {
+  display: none !important;
+}
+
+.search-group-label {
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background-color var(--t-fast), border-color var(--t-fast);
+}
+
+.search-result:hover {
+  background: var(--brand-soft);
+  border-color: var(--brand-ring);
+}
+
+.search-result__title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+.search-result__meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.search-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.search-active-chip {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-ring);
+  border-radius: var(--r-sm);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.search-active-chip strong {
+  font-weight: 600;
+}
+
+.search-active-chip em {
+  font-style: normal;
+  color: var(--muted-strong);
+}
+
+.search-active-clear {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  color: var(--brand-strong);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+
+.search-active-clear:hover {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+/* Highlighted boxes when a search SKU/location is active */
+.has-search-highlight [data-code]:not(.search-hit) {
+  opacity: 0.32;
+  filter: grayscale(0.3);
+  transition: opacity var(--t-base), filter var(--t-base);
+}
+
+.search-hit {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--brand-ring);
+  position: relative;
+  z-index: 2;
+  animation: search-hit-flash 1.4s ease-out 1;
+}
+
+@keyframes search-hit-flash {
+  0% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* Heatmap mode — make existing fullness statuses pop */
+.heatmap-toggle.active {
+  background: var(--brand);
+  color: #ffffff;
+  border-color: var(--brand-strong);
+}
+
+body.heatmap-mode .box-position,
+body.heatmap-mode .box-tile,
+body.heatmap-mode .map-slot {
+  transition: background-color var(--t-fast);
+}
+
+body.heatmap-mode .box-position.empty,
+body.heatmap-mode .box-tile.empty,
+body.heatmap-mode .map-slot.empty {
+  background: rgba(220, 38, 38, 0.18) !important;
+  border-color: rgba(220, 38, 38, 0.55) !important;
+  color: var(--red) !important;
+}
+
+body.heatmap-mode .box-position.low,
+body.heatmap-mode .box-tile.low,
+body.heatmap-mode .map-slot.low {
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  color: var(--amber) !important;
+}
+
+body.heatmap-mode .box-position.healthy,
+body.heatmap-mode .box-tile.healthy,
+body.heatmap-mode .map-slot.healthy {
+  background: rgba(22, 163, 74, 0.18) !important;
+  border-color: rgba(22, 163, 74, 0.55) !important;
+  color: var(--green) !important;
+}
+
 /* Inventory editing is disabled on the live deploy — stock is read-only and
    driven by PVX. Layout editing stays available via the Layout Builder view. */
 .dashboard-panel:has(#stockForm),
