@@ -234,11 +234,12 @@ export function Warehouse3D({ onClose }: Props) {
           enableZoom
           zoomToCursor
           zoomSpeed={1.4}
-          // min/max scale with the initial framing zoom — absolute caps
-          // (the old 0.3/5) either clipped the starting view or made it
-          // impossible to pinch in close enough to read a single bay.
-          minZoom={initialZoom * 0.35}
-          maxZoom={initialZoom * 25}
+          // No upper zoom cap — two-finger pinch should go as deep as
+          // the user wants (down to a single slot if needed). minZoom
+          // stays scaled to the initial framing so a hard pinch-out
+          // doesn't lose the warehouse off-screen.
+          minZoom={initialZoom * 0.25}
+          maxZoom={Infinity}
           target={bounds.centre}
           dampingFactor={0.12}
         />
