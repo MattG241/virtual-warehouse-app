@@ -69,21 +69,45 @@ export function Topbar({ title }: Props) {
         <h2 className="truncate text-lg font-semibold text-ink sm:text-xl">{title}</h2>
       </div>
 
-      <button
-        type="button"
-        onClick={openSearch}
-        className="hidden sm:flex group h-10 min-w-[280px] items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm text-muted transition hover:border-line-strong hover:text-ink"
+      {/* Desktop: real input. Typing pops the overlay with the typed text
+          pre-seeded so search starts immediately. Focus alone (no typing)
+          also opens it for a clean "click the search bar" feel. */}
+      <div
+        className="relative hidden sm:flex items-center"
+        onClick={(e) => {
+          // Clicking anywhere on the wrapper focuses the input
+          const input = e.currentTarget.querySelector('input') as HTMLInputElement | null
+          input?.focus()
+        }}
       >
-        <Search className="h-4 w-4" />
-        <span>Search anything…</span>
-        <kbd className="ml-auto rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-subtle">
+        <Search className="pointer-events-none absolute left-3 h-4 w-4 text-muted" />
+        <input
+          type="search"
+          placeholder="Search anything…"
+          // Stays empty in the topbar — actual query is in the overlay
+          value=""
+          onChange={(e) => openSearch(e.target.value)}
+          onFocus={(e) => {
+            // Open the overlay; pre-seed only if there's already text
+            openSearch(e.target.value)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              openSearch()
+            }
+          }}
+          aria-label="Search"
+          className="h-10 min-w-[280px] rounded-lg border border-line bg-surface pl-10 pr-16 text-sm text-ink placeholder:text-muted focus:border-brand-ring focus:outline-none focus:ring-2 focus:ring-brand-ring/30"
+        />
+        <kbd className="pointer-events-none absolute right-3 rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-subtle">
           ⌘K
         </kbd>
-      </button>
+      </div>
 
       <button
         type="button"
-        onClick={openSearch}
+        onClick={() => openSearch()}
         aria-label="Search"
         className="sm:hidden grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-muted hover:text-ink"
       >

@@ -1,4 +1,5 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, MapPin, AlertTriangle, CircleSlash2, Check, X } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -19,10 +20,60 @@ const FILTERS: { key: FilterKey; label: string; tone: 'subtle' | 'good' | 'warn'
 
 export function Inventory() {
   const inv = useInventory((s) => s.inventory)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [params, setParams] = useSearchParams()
+  // Seed from ?q=… so the search overlay can deep-link straight to a SKU.
+  // ?status=low / critical / empty / healthy seeds the filter chip.
+  const [query, setQuery] = useState(() => params.get('q') || '')
+  const [filter, setFilter] = useState<FilterKey>(() => {
+    const s = params.get('status') as FilterKey | null
+    return s && ['all', 'healthy', 'low', 'critical', 'empty'].includes(s) ? s : 'all'
+  })
   const [selected, setSelected] = useState<SkuSummary | null>(null)
   const deferredQ = useDeferredValue(query.trim().toLowerCase())
+
+  // If the URL params change after mount (e.g. search-overlay used twice in
+  // a row), update local state to match.
+  const lastParamsRef = useRef('')
+  useEffect(() => {
+    const sig = `${params.get('q') || ''}|${params.get('status') || ''}`
+    if (sig === lastParamsRef.current) return
+    lastParamsRef.current = sig
+    const q = params.get('q')
+    const s = params.get('status') as FilterKey | null
+    if (q !== null) setQuery(q)
+    if (s && ['all', 'healthy', 'low', 'critical', 'empty'].includes(s)) setFilter(s)
+  }, [params])
+
+  // Auto-open the SKU sheet if the search overlay deep-linked to an exact
+  // SKU code (so the user lands on the detail, not a filtered list).
+  const autoOpenedRef = useRef(false)
+  useEffect(() => {
+    if (autoOpenedRef.current) return
+    if (!inv) return
+    const q = (params.get('q') || '').trim()
+    if (!q) return
+    const allSkus = perSku(inv)
+    const exact = allSkus.find((s) => s.sku.toLowerCase() === q.toLowerCase())
+    if (exact) {
+      setSelected(exact)
+      autoOpenedRef.current = true
+    }
+  }, [inv, params])
+
+  // Keep the URL in sync with the visible query/filter — clearing the
+  // search box clears ?q= so back/forward feels natural.
+  useEffect(() => {
+    const next = new URLSearchParams(params)
+    const q = query.trim()
+    if (q) next.set('q', q)
+    else next.delete('q')
+    if (filter !== 'all') next.set('status', filter)
+    else next.delete('status')
+    if (next.toString() !== params.toString()) {
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, filter])
 
   const skus = useMemo(() => (inv ? perSku(inv) : []), [inv])
 

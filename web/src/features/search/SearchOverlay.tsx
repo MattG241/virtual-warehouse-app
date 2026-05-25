@@ -4,7 +4,7 @@ import { Search as SearchIcon, X, Package, MapPin, ArrowRight } from 'lucide-rea
 import { useSearch } from './store'
 import { useInventory } from '@/features/inventory/store'
 import { cn } from '@/lib/cn'
-import { fmtN } from '@/lib/inventory'
+import { allSlots, fmtN } from '@/lib/inventory'
 import type { Inventory } from '@/lib/types'
 
 type Tab = 'all' | 'products' | 'locations'
@@ -66,12 +66,13 @@ function rank(inv: Inventory | null, q: string, tab: Tab): { skus: SkuHit[]; loc
 
   const locs: LocHit[] = []
   if (tab !== 'products') {
-    const seen = new Set<string>()
-    for (const code of Object.keys(inv.grid)) {
-      if (code.toLowerCase().includes(qLow) && !seen.has(code)) {
-        seen.add(code)
-        const units = (inv.grid[code] || []).reduce((s, [, q]) => s + (Number(q) || 0), 0)
-        locs.push({ kind: 'location', code, units })
+    // Search against *every* physical slot, not just stocked ones, so a
+    // partial code like "A01.B01" finds the bay even when it's empty —
+    // that's the put-away workflow (find an empty slot by location).
+    const slots = allSlots(inv)
+    for (const slot of slots) {
+      if (slot.code.toLowerCase().includes(qLow)) {
+        locs.push({ kind: 'location', code: slot.code, units: slot.totalUnits })
         if (locs.length >= MAX_LOC) break
       }
     }
@@ -82,6 +83,7 @@ function rank(inv: Inventory | null, q: string, tab: Tab): { skus: SkuHit[]; loc
 
 export function SearchOverlay() {
   const isOpen = useSearch((s) => s.isOpen)
+  const initialQuery = useSearch((s) => s.initialQuery)
   const close = useSearch((s) => s.close)
   const inv = useInventory((s) => s.inventory)
   const navigate = useNavigate()
@@ -92,12 +94,19 @@ export function SearchOverlay() {
 
   useEffect(() => {
     if (isOpen) {
-      setQ('')
+      setQ(initialQuery)
       setActiveIdx(0)
       setTab('all')
-      requestAnimationFrame(() => inputRef.current?.focus())
+      requestAnimationFrame(() => {
+        const el = inputRef.current
+        if (!el) return
+        el.focus()
+        // Put the caret at the end so typing continues naturally
+        const len = el.value.length
+        el.setSelectionRange(len, len)
+      })
     }
-  }, [isOpen])
+  }, [isOpen, initialQuery])
 
   useEffect(() => {
     if (!isOpen) return
@@ -119,7 +128,15 @@ export function SearchOverlay() {
     if (hit.kind === 'sku') {
       navigate(`/inventory?q=${encodeURIComponent(hit.sku)}`)
     } else {
-      navigate(`/warehouse?loc=${encodeURIComponent(hit.code)}`)
+      // Parse the location code "A01.B05.L02.S3" and drill straight into
+      // the aisle walk-through with the slot pre-selected.
+      const aisleMatch = /^(A\d+)/.exec(hit.code)
+      const aisleId = aisleMatch?.[1]
+      if (aisleId) {
+        navigate(`/warehouse/${aisleId}?slot=${encodeURIComponent(hit.code)}`)
+      } else {
+        navigate(`/warehouse?loc=${encodeURIComponent(hit.code)}`)
+      }
     }
     close()
   }
