@@ -332,19 +332,30 @@ button {
 
 .topbar-actions {
   display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .search-field {
-  display: grid;
-  gap: 5px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 280px;
+  min-width: 0;
+  max-width: 480px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+}
+
+.search-field__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  transition: color var(--t-fast);
 }
 
 .search-field input,
@@ -365,13 +376,14 @@ select,
 }
 
 .search-field input {
-  width: min(34vw, 380px);
-  max-width: 100%;
+  width: 100%;
+  padding-left: 36px;
+  padding-right: 38px;
 }
 
-.search-field {
-  min-width: 0;
-  max-width: 100%;
+.search-field input:focus + .search-field__icon,
+.search-field input:focus ~ .search-field__icon {
+  color: var(--brand);
 }
 
 .search-field input:focus,
@@ -879,54 +891,32 @@ body.is-signed-out #layoutView .section-heading::after {
   font-weight: 400;
 }
 
-/* Barcode scan button + scanner modal */
-.search-field--with-results {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 6px;
-  align-items: end;
-}
-
-.search-field--with-results > span {
-  grid-column: 1 / -1;
-}
-
-.search-field--with-results > input {
-  grid-column: 1 / 2;
-}
-
-.search-field--with-results > .scan-button {
-  grid-column: 2 / 3;
-}
-
-.search-field--with-results > .search-results,
-.search-field--with-results > .search-active-chip {
-  grid-column: 1 / -1;
-}
-
+/* Barcode scan button (lives inside the search input) + scanner modal */
 .scan-button {
-  width: 38px;
-  height: 38px;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-xs);
+  color: var(--muted);
   cursor: pointer;
-  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
-  flex-shrink: 0;
+  transition: background-color var(--t-fast), color var(--t-fast);
 }
 
 .scan-button:hover {
   background: var(--brand-soft);
-  border-color: var(--brand-ring);
   color: var(--brand-strong);
 }
 
 .scan-button svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .scanner-modal {
@@ -1069,7 +1059,8 @@ body.is-signed-out #layoutView .section-heading::after {
   transition: background-color var(--t-fast), border-color var(--t-fast);
 }
 
-.search-result:hover {
+.search-result:hover,
+.search-result.is-selected {
   background: var(--brand-soft);
   border-color: var(--brand-ring);
 }
@@ -1098,20 +1089,29 @@ body.is-signed-out #layoutView .section-heading::after {
 }
 
 .search-active-chip {
-  margin-top: 6px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 25;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px 6px 10px;
-  font-size: 11px;
+  padding: 8px 10px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--brand-strong);
   background: var(--brand-soft);
   border: 1px solid var(--brand-ring);
   border-radius: var(--r-sm);
+  box-shadow: var(--shadow-sm);
   text-transform: none;
   letter-spacing: 0;
+}
+
+.search-active-chip[hidden] {
+  display: none !important;
 }
 
 .search-active-chip strong {
@@ -1144,8 +1144,8 @@ body.is-signed-out #layoutView .section-heading::after {
 
 /* Highlighted boxes when a search SKU/location is active */
 .has-search-highlight [data-code]:not(.search-hit) {
-  opacity: 0.32;
-  filter: grayscale(0.3);
+  opacity: 0.45;
+  filter: grayscale(0.4);
   transition: opacity var(--t-base), filter var(--t-base);
 }
 
@@ -1211,25 +1211,72 @@ body.heatmap-mode .map-slot.healthy {
 .sync-status {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--panel);
-  color: var(--muted-strong);
-  font-size: 12px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+  user-select: none;
+}
+
+@media (max-width: 720px) {
+  .sync-status {
+    display: none;
+  }
+}
+
+/* The standalone icon button used for Sync now (refresh icon + state dot) */
+.icon-button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+
+.icon-button:hover {
+  background: var(--panel-strong);
+  border-color: var(--line-strong);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .sync-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+/* Backwards compat: still used by scanner-ui standalone button (mobile) */
+.search-status-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: #94a3b8;
-  flex-shrink: 0;
 }
 
 .sync-dot[data-state="idle"] {
@@ -2983,31 +3030,33 @@ td {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto auto;
+    grid-template-rows: auto;
     gap: 8px;
-    align-items: stretch;
+    align-items: center;
   }
 
-  .sync-status {
-    grid-column: 1 / 2;
-    min-height: 38px;
-    font-size: 11px;
-    padding: 0 10px;
-  }
-
-  #syncNowButton {
-    grid-column: 2 / 3;
-    min-height: 38px;
-    padding: 0 10px;
-  }
-
+  /* Row 1: search across the full width */
   .search-field {
     grid-column: 1 / -1;
+    max-width: none;
   }
 
   .search-field input {
     width: 100%;
     min-height: 40px;
+  }
+
+  /* Row 2 (auto-flow): icon buttons + auth chip share one row */
+  #syncNowButton,
+  .export-menu,
+  .auth-chip {
+    grid-column: auto;
+  }
+
+  /* Auth chip takes whatever's left in row 2 */
+  .auth-chip {
+    margin-left: auto;
   }
 
   .section-heading,

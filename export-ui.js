@@ -7,13 +7,12 @@
   const wrap = document.createElement('div');
   wrap.className = 'export-menu';
   wrap.innerHTML = `
-    <button type="button" class="utility-button export-menu__btn" data-action="toggle" title="Download stock data as CSV">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:6px;vertical-align:-2px">
+    <button type="button" class="icon-button export-menu__btn" data-action="toggle" title="Download stock data as CSV" aria-label="Export reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="7 10 12 15 17 10"/>
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
-      Export
     </button>
     <div class="export-menu__panel" hidden>
       <div class="export-menu__group-label">Reports</div>
@@ -36,9 +35,13 @@
     </div>
   `;
 
-  // Slot it just before the search field so it sits next to the sync controls.
-  const searchField = topbarActions.querySelector('.search-field');
-  topbarActions.insertBefore(wrap, searchField || null);
+  // Slot it just before the auth chip (right side of the topbar)
+  const authChip = topbarActions.querySelector('.auth-chip');
+  if (authChip) {
+    topbarActions.insertBefore(wrap, authChip);
+  } else {
+    topbarActions.appendChild(wrap);
+  }
 
   const btn = wrap.querySelector('.export-menu__btn');
   const panel = wrap.querySelector('.export-menu__panel');

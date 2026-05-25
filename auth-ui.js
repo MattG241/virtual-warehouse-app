@@ -11,7 +11,8 @@
   if (!topbarActions) return;
   const authChip = document.createElement('div');
   authChip.className = 'auth-chip';
-  topbarActions.insertBefore(authChip, topbarActions.firstChild);
+  // Sits on the far right of the topbar
+  topbarActions.appendChild(authChip);
 
   // --- Modal ---------------------------------------------------------------
   const modal = document.createElement('div');

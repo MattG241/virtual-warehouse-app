@@ -67,16 +67,40 @@
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      hidePanel();
-      input.blur();
+      if (input.value || document.body.classList.contains('has-search-highlight')) {
+        clearHighlight();
+        input.value = '';
+        hidePanel();
+      } else {
+        hidePanel();
+        input.blur();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveSelection(-1);
     } else if (e.key === 'Enter') {
-      const first = panel.querySelector('[data-action]');
-      if (first) {
+      const selected = panel.querySelector('[data-action].is-selected') ||
+        panel.querySelector('[data-action]');
+      if (selected) {
         e.preventDefault();
-        first.click();
+        selected.click();
       }
     }
   });
+
+  function moveSelection(direction) {
+    const items = Array.from(panel.querySelectorAll('[data-action]'));
+    if (!items.length) return;
+    const idx = items.findIndex((el) => el.classList.contains('is-selected'));
+    let next = idx + direction;
+    if (next < 0) next = items.length - 1;
+    if (next >= items.length) next = 0;
+    items.forEach((el, i) => el.classList.toggle('is-selected', i === next));
+    items[next].scrollIntoView({ block: 'nearest' });
+  }
   document.addEventListener('click', (e) => {
     if (!wrap.contains(e.target)) hidePanel();
   });
@@ -110,15 +134,25 @@
     const skuMatches = [];
     for (const [sku, meta] of Object.entries(idx.skuMeta)) {
       const name = (meta && meta[0]) || '';
-      const hay = `${sku} ${name}`.toLowerCase();
-      if (hay.includes(qLow)) {
+      const skuLow = sku.toLowerCase();
+      const nameLow = name.toLowerCase();
+      let score = 0;
+      if (skuLow === qLow) score = 1000;
+      else if (skuLow.startsWith(qLow)) score = 700;
+      else if (nameLow === qLow) score = 600;
+      else if (nameLow.startsWith(qLow)) score = 500;
+      else if (skuLow.includes(qLow)) score = 300;
+      else if (nameLow.includes(qLow)) score = 200;
+      if (score > 0) {
         const locs = idx.skuLocations.get(sku) || [];
         const total = locs.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-        skuMatches.push({ sku, name, locations: locs, total });
-        if (skuMatches.length >= MAX_SKU_RESULTS) break;
+        skuMatches.push({ sku, name, locations: locs, total, score });
       }
     }
-    skuMatches.sort((a, b) => b.total - a.total);
+    // Sort by relevance score first, then by total stock as a tie-breaker so
+    // common items rank above near-empties when both are exact prefix matches.
+    skuMatches.sort((a, b) => b.score - a.score || b.total - a.total);
+    skuMatches.length = Math.min(skuMatches.length, MAX_SKU_RESULTS);
 
     const locMatches = idx.locations
       .filter((c) => c.toLowerCase().includes(qLow))

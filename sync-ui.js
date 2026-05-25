@@ -91,31 +91,36 @@
 
   function setLastSync(iso) {
     if (!els.text) return;
+    const status = els.status;
     if (!iso) {
-      els.text.textContent = 'Last sync: never';
+      els.text.textContent = 'never';
       els.dot.dataset.state = 'stale';
+      if (status) status.title = 'Never synced';
       return;
     }
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) {
-      els.text.textContent = `Last sync: ${iso}`;
+      els.text.textContent = String(iso);
       els.dot.dataset.state = 'idle';
+      if (status) status.title = String(iso);
       return;
     }
-    els.text.textContent = `Last sync: ${formatAgo(date)}`;
-    els.text.title = date.toLocaleString();
+    els.text.textContent = formatAgo(date);
+    if (status) status.title = `Last sync: ${date.toLocaleString()}`;
+    if (els.button) els.button.title = `Sync now (last: ${formatAgo(date)})`;
     els.dot.dataset.state = ageMs(date) > 15 * 60 * 1000 ? 'stale' : 'idle';
   }
 
   function setRunning(label) {
     if (!els.text) return;
-    els.text.textContent = label;
+    els.text.textContent = label || 'syncing';
     els.dot.dataset.state = 'running';
   }
 
   function setError(msg) {
     if (!els.text) return;
-    els.text.textContent = `Sync failed: ${msg}`;
+    els.text.textContent = 'failed';
+    if (els.status) els.status.title = `Sync failed: ${msg}`;
     els.dot.dataset.state = 'error';
   }
 
@@ -126,12 +131,13 @@
   function formatAgo(date) {
     const seconds = Math.round(ageMs(date) / 1000);
     if (seconds < 5) return 'just now';
-    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 60) return `${seconds}s`;
     const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes} min ago`;
+    if (minutes < 60) return `${minutes}m`;
     const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} h ago`;
-    return date.toLocaleString();
+    if (hours < 24) return `${hours}h`;
+    const days = Math.round(hours / 24);
+    return `${days}d`;
   }
 
   async function safeJson(res) {

@@ -11,13 +11,13 @@
     typeof window.BarcodeDetector !== 'undefined' &&
     typeof navigator.mediaDevices?.getUserMedia === 'function';
 
-  // --- Scan button slot in the search field --------------------------------
+  // --- Scan button inside the search field ---------------------------------
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.id = 'scanButton';
   btn.className = 'scan-button';
   btn.setAttribute('aria-label', 'Scan a barcode');
-  btn.title = supportsDetector ? 'Scan a barcode' : 'Type a barcode (camera scan needs Chrome)';
+  btn.title = supportsDetector ? 'Scan a barcode' : 'Enter a barcode (camera scan needs Chrome)';
   btn.innerHTML = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
@@ -25,13 +25,12 @@
       <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
       <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
       <path d="M7 8h0"/>
-      <path d="M7 12h0"/>
-      <path d="M7 16h0"/>
       <path d="M11 8v8"/>
       <path d="M15 8v8"/>
       <path d="M19 8v8"/>
     </svg>
   `;
+  // The search field is now position:relative — place scan button inside it
   wrap.appendChild(btn);
 
   btn.addEventListener('click', openScanner);
