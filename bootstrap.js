@@ -34,6 +34,7 @@ try {
 }
 
 await loadScript('./live-updates.js');
+await loadScript('./auth-ui.js');
 await loadScript('./app.js');
 await loadScript('./sync-ui.js');
 await loadScript('./search-ui.js');

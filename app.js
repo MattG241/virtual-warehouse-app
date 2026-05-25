@@ -168,6 +168,12 @@ function saveState() {
     console.warn("Could not cache warehouse state", error);
   }
   if (_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
+  // Skip the server save attempt if we know the user is signed out — the
+  // 401 round-trip just adds noise. The change still sits in localStorage
+  // so they don't lose it if they sign in next.
+  if (document.body.classList.contains('is-signed-out')) {
+    return;
+  }
   _layoutSaveTimer = setTimeout(() => {
     fetch('./api/layout', {
       method: 'PUT',
@@ -178,6 +184,12 @@ function saveState() {
       body: JSON.stringify({ aisles: state.aisles, dataVersion: state.dataVersion || '' }),
     })
       .then((r) => {
+        if (r.status === 401) {
+          console.warn("Layout save rejected — sign in to persist edits.");
+          document.body.classList.add('is-signed-out');
+          document.body.classList.remove('is-signed-in');
+          return;
+        }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
       })
       .catch((err) => console.warn("Could not save layout to server", err.message));

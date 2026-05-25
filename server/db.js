@@ -39,5 +39,15 @@ export async function initSchema() {
       data       JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id         BIGSERIAL PRIMARY KEY,
+      user_email TEXT,
+      action     TEXT NOT NULL,
+      payload    JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log(created_at DESC);
   `);
 }

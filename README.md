@@ -57,12 +57,36 @@ npm run sync:once
 4. Deploy. First sync runs on boot; subsequent syncs every 5 min. Watch logs for `[sync] run #N ok — X rows in Yms`.
 5. Generate a public domain in **Settings → Networking** and open it. The frontend will fetch from `/api/inventory` automatically.
 
+### Auth setup (magic-link sign-in)
+
+Layout edits require authentication. Stock viewing remains public.
+
+Add these to Railway → service → **Variables**:
+
+| Variable         | Value                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `JWT_SECRET`     | A 48+ byte random string. Generate locally: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `ALLOWED_EMAILS` | Comma-separated emails allowed to sign in. Use `*` to allow any (not recommended).                                 |
+| `RESEND_API_KEY` | Optional. API key from [resend.com](https://resend.com) (free tier: 3,000 emails/month).                           |
+| `RESEND_SENDER` | Optional. Defaults to `onboarding@resend.dev`. Verify your own domain in Resend for branded mail.                  |
+| `APP_URL`        | Optional. e.g. `https://your-app.up.railway.app`. Inferred from request headers if omitted.                        |
+| `NODE_ENV`       | Set to `production` so cookies are flagged `Secure`.                                                               |
+
+If `RESEND_API_KEY` is not set, magic links are printed to the server logs instead of emailed — useful for first-time testing. Set it once you're ready to go live.
+
 ### Operational endpoints
 
 - `GET /api/health` — DB ping.
 - `GET /api/inventory` — current snapshot in the frontend's `WAREHOUSE_DATA` shape.
 - `GET /api/sync-status` — last 10 sync runs.
-- `POST /api/sync-now` — kick off a sync manually (no auth — keep this private or add one before exposing publicly).
+- `POST /api/sync-now` — kick off a sync manually.
+- `GET /api/events` — Server-Sent Events stream (sync.started/completed, layout.updated).
+- `POST /api/auth/request` — body `{ email }`, sends magic link if allowed.
+- `GET /api/auth/verify?token=...` — magic link target, sets session cookie.
+- `GET /api/auth/me` — returns the current user (or null).
+- `POST /api/auth/logout` — clears the session cookie.
+- `GET /api/audit?limit=N` — audit log (requires auth).
+- `PUT /api/layout` — saves the warehouse layout (requires auth).
 
 ## Known gotchas, baked in
 
