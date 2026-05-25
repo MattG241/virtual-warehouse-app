@@ -105,6 +105,19 @@ body {
 /* Numbers tabular */
 .tnum { font-variant-numeric: tabular-nums; }
 
+/* Respect "Reduce motion" OS setting — kills the pulse / shimmer / slide
+   animations so users with vestibular sensitivities aren't bombarded. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Warehouse floor — concrete-ish texture with depth lines */
 .warehouse-floor {
   background:

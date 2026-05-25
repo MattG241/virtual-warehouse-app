@@ -3,6 +3,10 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { MobileTabBar } from './MobileTabBar'
 import { SearchOverlay } from '@/features/search/SearchOverlay'
+import { StaleDataBanner } from './SyncIndicator'
+import { InstallPrompt } from '@/features/pwa/InstallPrompt'
+import { PullToRefresh } from './PullToRefresh'
+import { useInventory } from '@/features/inventory/store'
 
 interface Props {
   title: string
@@ -10,17 +14,22 @@ interface Props {
 }
 
 export function AppShell({ title, children }: Props) {
+  const refresh = useInventory((s) => s.refresh)
   return (
-    <div className="flex min-h-dvh bg-bg text-ink">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-3 sm:px-6 lg:px-8 lg:pb-8">
-          <Topbar title={title} />
-          {children}
-        </main>
-        <MobileTabBar />
+    <PullToRefresh onRefresh={refresh}>
+      <div className="flex min-h-dvh bg-bg text-ink">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-3 sm:px-6 lg:px-8 lg:pb-8">
+            <Topbar title={title} />
+            <StaleDataBanner />
+            {children}
+          </main>
+          <MobileTabBar />
+        </div>
+        <SearchOverlay />
+        <InstallPrompt />
       </div>
-      <SearchOverlay />
-    </div>
+    </PullToRefresh>
   )
 }
