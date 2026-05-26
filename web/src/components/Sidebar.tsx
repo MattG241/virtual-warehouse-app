@@ -39,26 +39,18 @@ export function Sidebar() {
       aria-label="Primary navigation"
     >
       <div className="mb-5 flex items-center gap-3 px-2 pt-1">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-grad text-white shadow-glow">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            <path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z" />
-            <path d="M6 18V11" />
-            <path d="M10 14v4" />
-            <path d="M14 14v4" />
-            <path d="M18 11v7" />
-          </svg>
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-grad shadow-glow">
+          <img
+            src="/ryderwear-mark.png"
+            alt=""
+            aria-hidden
+            className="h-7 w-7 object-contain"
+            draggable={false}
+          />
         </div>
         <div className="min-w-0">
-          <h1 className="text-sm font-bold tracking-tight text-ink">Virtual Warehouse</h1>
-          <p className="text-[11px] text-muted">Live stock control</p>
+          <h1 className="text-sm font-bold tracking-[0.18em] text-ink">RYDERWEAR</h1>
+          <p className="text-[11px] text-muted">Virtual Warehouse</p>
         </div>
       </div>
 

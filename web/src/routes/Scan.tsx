@@ -5,7 +5,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useInventory } from '@/features/inventory/store'
 import { cn } from '@/lib/cn'
-import { fmtN, timeAgo } from '@/lib/inventory'
+import { fmtN, normalizeLocationCode, timeAgo } from '@/lib/inventory'
 
 // Native BarcodeDetector is gated to Chromium/Android Safari at time of
 // writing. Fall back to a manual entry prompt elsewhere so the button
@@ -22,6 +22,8 @@ interface ScanRecord {
   kind: 'sku' | 'location' | 'unknown'
   name?: string
   units?: number
+  // For a scanned location: what's in the box, biggest-qty first.
+  contents?: { sku: string; qty: number; name: string }[]
   at: number
 }
 
@@ -66,10 +68,21 @@ export function Scan() {
         }
         return { raw: value, resolved: sku, kind: 'sku', name: meta[0] || '', units, at }
       }
-      // Location lookup
-      if (inv.grid[value]) {
-        const units = inv.grid[value].reduce((s, [, q]) => s + (Number(q) || 0), 0)
-        return { raw: value, resolved: value, kind: 'location', units, at }
+      // Location lookup — normalise loose input ("A3.B06.L05.S6") to the
+      // canonical key the server emits ("A03.B06.L05.S6") before falling
+      // back to a raw exact match for non-grid (other) labels.
+      const canonical = normalizeLocationCode(value) || value
+      if (inv.grid[canonical]) {
+        const entries = inv.grid[canonical]
+        const units = entries.reduce((s, [, q]) => s + (Number(q) || 0), 0)
+        const contents = entries
+          .map(([s, q]) => ({
+            sku: s,
+            qty: Number(q) || 0,
+            name: inv.skus?.[s]?.[0] || '',
+          }))
+          .sort((a, b) => b.qty - a.qty)
+        return { raw: value, resolved: canonical, kind: 'location', units, contents, at }
       }
       return { raw: value, resolved: value, kind: 'unknown', at }
     },
@@ -160,7 +173,7 @@ export function Scan() {
                   <button
                     type="button"
                     onClick={() => handleScan(rec.raw)}
-                    className="group flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-surface-2"
+                    className="group flex w-full items-start gap-3 px-5 py-3 text-left transition hover:bg-surface-2"
                   >
                     <span
                       className={cn(
@@ -177,8 +190,15 @@ export function Scan() {
                       )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono text-sm font-semibold text-ink">
-                        {rec.resolved}
+                      <div className="flex items-center gap-2">
+                        <div className="truncate font-mono text-sm font-semibold text-ink">
+                          {rec.resolved}
+                        </div>
+                        {rec.kind === 'location' && rec.contents && rec.contents.length > 0 && (
+                          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                            {rec.contents.length} SKU{rec.contents.length === 1 ? '' : 's'}
+                          </span>
+                        )}
                       </div>
                       <div className="truncate text-[11px] text-muted">
                         {rec.kind === 'sku'
@@ -188,13 +208,42 @@ export function Scan() {
                             : 'Not recognised'}
                         {typeof rec.units === 'number' && ` · ${fmtN(rec.units)} units`}
                       </div>
+                      {rec.kind === 'location' && rec.contents && (
+                        <ul className="mt-2 space-y-1">
+                          {rec.contents.length === 0 ? (
+                            <li className="text-[11px] italic text-muted">Empty box</li>
+                          ) : (
+                            rec.contents.slice(0, 6).map((c) => (
+                              <li
+                                key={c.sku}
+                                className="flex items-baseline gap-2 text-[11px]"
+                              >
+                                <span className="font-mono font-semibold text-ink">
+                                  {c.sku}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-muted">
+                                  {c.name || '—'}
+                                </span>
+                                <span className="flex-shrink-0 font-mono font-semibold text-ink">
+                                  ×{fmtN(c.qty)}
+                                </span>
+                              </li>
+                            ))
+                          )}
+                          {rec.contents.length > 6 && (
+                            <li className="text-[11px] italic text-muted">
+                              +{rec.contents.length - 6} more…
+                            </li>
+                          )}
+                        </ul>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 text-[11px] text-muted">
+                    <div className="flex flex-shrink-0 items-center gap-1 text-[11px] text-muted">
                       <Clock className="h-3 w-3" />
                       {timeAgo(new Date(rec.at).toISOString())}
                     </div>
                     {rec.kind !== 'unknown' && (
-                      <ArrowRight className="h-4 w-4 text-subtle transition group-hover:translate-x-1 group-hover:text-ink" />
+                      <ArrowRight className="mt-1 h-4 w-4 flex-shrink-0 text-subtle transition group-hover:translate-x-1 group-hover:text-ink" />
                     )}
                   </button>
                 </li>
