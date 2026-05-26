@@ -45,7 +45,7 @@ function loadConfig() {
       openOrdersColumns:
         process.env.PVX_OPEN_ORDERS_COLUMNS || '[Order Number]',
     },
-    warehouseTz: process.env.WAREHOUSE_TZ || 'Australia/Sydney',
+    warehouseTz: process.env.WAREHOUSE_TZ || 'Australia/Adelaide',
     baselineHour: Number(process.env.ORDER_BASELINE_HOUR || 8),
     sync: {
       intervalMs: Number(process.env.SYNC_INTERVAL_MS || 300000),

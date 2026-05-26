@@ -105,7 +105,7 @@ On the warehouse TV (`/leaderboard`) we show a single progress bar of *"orders d
    | --------------------------- | ------------------------------------------------------------------------------------------- |
    | `PVX_OPEN_ORDERS_TEMPLATE`  | Exact PVX template name. Empty = feature off.                                               |
    | `PVX_OPEN_ORDERS_COLUMNS`   | Default `[Order Number]`. Any single column works — we count rows.                          |
-   | `WAREHOUSE_TZ`              | Default `Australia/Sydney`. Used to decide what "today" and "8am" mean.                     |
+   | `WAREHOUSE_TZ`              | Default `Australia/Adelaide`. Used to decide what "today" and "8am" mean.                   |
    | `ORDER_BASELINE_HOUR`       | Default `8`. First sync at/after this local hour seeds the day's progress-bar denominator.  |
 
 3. Each sync the server pulls the template and stores the open-order count in `order_state`. The first sync after 8am (warehouse-local) inserts a row into `order_baselines` for that day — that becomes the day's denominator.

@@ -230,8 +230,15 @@ export function LeaderboardTv() {
   }, [ranked, mode, win])
 
   const now = new Date()
-  const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })
-  const dateStr = now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
+  // Lock the displayed time/date to the warehouse timezone (Adelaide)
+  // so the TV reads the same no matter where the browser is.
+  const tz = 'Australia/Adelaide'
+  const timeStr = now.toLocaleTimeString('en-AU', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+  const dateStr = now.toLocaleDateString('en-AU', {
+    timeZone: tz, weekday: 'long', day: 'numeric', month: 'long',
+  })
 
   // Theme-aware tokens — defined once so the JSX stays readable
   const t = {
