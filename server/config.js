@@ -23,7 +23,11 @@ function loadConfig() {
       // Pulls PVX's "User activity" report (cumulative per-user totals) and
       // snapshots it each sync so the API can diff over time windows.
       // Set PVX_PICK_TEMPLATE to '' to disable.
-      pickTemplate: process.env.PVX_PICK_TEMPLATE || 'User activity',
+      // "User activity - Today" applies a today-only filter at the PVX
+      // template level, so each snapshot already represents today's
+      // activity. The widget's Today tab reads these snapshots directly
+      // via mode=raw — no day-over-day baseline needed.
+      pickTemplate: process.env.PVX_PICK_TEMPLATE || 'User activity - Today',
       pickColumns:
         process.env.PVX_PICK_COLUMNS ||
         '[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]',
