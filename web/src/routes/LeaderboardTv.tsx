@@ -414,6 +414,9 @@ export function LeaderboardTv() {
           <NewsTicker items={tickerItems} isLight={isLight} borderClass={t.border} />
         )}
 
+        {/* ── Badge legend ─────────────────────────────────────────── */}
+        <BadgeLegend isLight={isLight} borderClass={t.border} />
+
         {/* ── Footer ───────────────────────────────────────────────── */}
         <footer className={cn('mt-4 flex flex-col items-start gap-3 border-t pt-4 text-[10px] uppercase tracking-[0.2em] sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]', t.border, t.textMuted)}>
           <div className="flex items-center gap-3">
@@ -598,7 +601,7 @@ function PodiumColumn({
               {board.metricLabel}
             </div>
             {badges.length > 0 && (
-              <BadgeRow badges={badges} size={isWinner ? 'lg' : 'md'} />
+              <BadgeRow badges={badges} size={isWinner ? 'xl' : 'lg'} />
             )}
           </>
         ) : (
@@ -911,18 +914,19 @@ function Dot({ active, accent }: { active: boolean; accent: string }) {
 
 // ─── Badge row ──────────────────────────────────────────────────────────
 
-const BADGE_PX: Record<'xs' | 'sm' | 'md' | 'lg', string> = {
-  xs: 'h-6 w-6 sm:h-7 sm:w-7',
-  sm: 'h-9 w-9',
-  md: 'h-11 w-11 sm:h-12 sm:w-12',
-  lg: 'h-14 w-14 sm:h-16 sm:w-16',
+const BADGE_PX: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', string> = {
+  xs: 'h-7 w-7 sm:h-8 sm:w-8',
+  sm: 'h-10 w-10 sm:h-12 sm:w-12',
+  md: 'h-12 w-12 sm:h-14 sm:w-14',
+  lg: 'h-16 w-16 sm:h-20 sm:w-20',
+  xl: 'h-20 w-20 sm:h-24 sm:w-24',
 }
 
 function BadgeRow({
   badges, size, align = 'center', onDark = false, max = 4,
 }: {
   badges: BadgeKey[]
-  size: 'xs' | 'sm' | 'md' | 'lg'
+  size: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   align?: 'center' | 'start'
   onDark?: boolean
   max?: number
@@ -968,6 +972,80 @@ function BadgeRow({
         </span>
       )}
     </div>
+  )
+}
+
+// ─── Badge legend ──────────────────────────────────────────────────────
+
+// Short, scannable rule each badge denotes — different from BADGES[].description
+// (the dashboard tooltip) because the TV legend must be readable from
+// 5+ metres away. Aim for ≤ 14 characters per line.
+const LEGEND_RULE: Record<BadgeKey, string> = {
+  'daily-mvp': '#1 picker today',
+  marathon:    '1,000+ items',
+  'half-k':    '500+ items',
+  century:     '100+ items',
+  'pack-pro':  '100+ orders out',
+  'clean-run': '0 skips today',
+}
+
+const LEGEND_ORDER: BadgeKey[] = [
+  'daily-mvp', 'marathon', 'half-k', 'century', 'pack-pro', 'clean-run',
+]
+
+function BadgeLegend({
+  isLight, borderClass,
+}: { isLight: boolean; borderClass: string }) {
+  return (
+    <section
+      className={cn(
+        'mt-4 flex items-center gap-3 border-t pt-3 sm:mt-5 sm:gap-4 sm:pt-4',
+        borderClass,
+      )}
+      aria-label="Badge legend"
+    >
+      <span
+        className={cn(
+          'hidden flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.32em] sm:inline',
+          isLight ? 'text-slate-500' : 'text-white/40',
+        )}
+      >
+        Earn
+      </span>
+      <ul className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2 sm:grid-cols-6 sm:gap-x-4">
+        {LEGEND_ORDER.map((key) => {
+          const meta = BADGES[key]
+          return (
+            <li key={key} className="flex items-center gap-2.5 sm:gap-3">
+              <img
+                src={meta.imageUrl}
+                alt={meta.label}
+                className="h-9 w-9 flex-shrink-0 sm:h-11 sm:w-11"
+                draggable={false}
+              />
+              <div className="min-w-0">
+                <div
+                  className={cn(
+                    'truncate text-[11px] font-bold uppercase tracking-wider sm:text-sm',
+                    isLight ? 'text-slate-900' : 'text-white',
+                  )}
+                >
+                  {meta.label}
+                </div>
+                <div
+                  className={cn(
+                    'truncate text-[10px] sm:text-xs',
+                    isLight ? 'text-slate-500' : 'text-white/50',
+                  )}
+                >
+                  {LEGEND_RULE[key]}
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 
