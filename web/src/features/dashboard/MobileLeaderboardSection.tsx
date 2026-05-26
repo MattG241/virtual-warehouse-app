@@ -21,22 +21,19 @@ const WINDOWS: { key: LeaderboardWindow; label: string }[] = [
 interface MetricCfg {
   primary: keyof LeaderboardRow
   unit: string
-  secondaryA: { key: keyof LeaderboardRow; label: string }
-  secondaryB: { key: keyof LeaderboardRow; label: string }
+  label: string
 }
 
 const METRICS: Record<Mode, MetricCfg> = {
   pick: {
     primary: 'items_picked',
     unit: 'items',
-    secondaryA: { key: 'picks_completed', label: 'picks' },
-    secondaryB: { key: 'items_skipped', label: 'skips' },
+    label: 'Items picked',
   },
   pack: {
     primary: 'items_despatched',
     unit: 'items',
-    secondaryA: { key: 'packages_despatched', label: 'pkgs' },
-    secondaryB: { key: 'orders_despatched', label: 'orders' },
+    label: 'Items packed',
   },
 }
 
@@ -224,14 +221,11 @@ function Row({
         </div>
       </div>
       <div className="text-right">
-        <div className="tnum text-base font-bold text-ink">
+        <div className="tnum text-xl font-bold text-ink leading-none">
           {fmtN(v)}
-          <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
-            {metric.unit}
-          </span>
         </div>
-        <div className="text-[10px] text-muted">
-          {fmtN(row[metric.secondaryA.key] as number)} {metric.secondaryA.label}
+        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+          {metric.unit}
         </div>
       </div>
     </li>

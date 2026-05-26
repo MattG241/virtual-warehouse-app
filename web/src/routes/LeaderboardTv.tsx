@@ -16,8 +16,6 @@ interface BoardConfig {
   label: string
   metricKey: keyof LeaderboardRow
   metricLabel: string
-  secondaryA: { key: keyof LeaderboardRow; label: string }
-  secondaryB: { key: keyof LeaderboardRow; label: string }
   accent: { text: string; bar: string; chip: string; ring: string }
   Icon: typeof Package
 }
@@ -30,8 +28,6 @@ const BOARDS: Record<Mode, BoardConfig> = {
     label: 'Picking',
     metricKey: 'items_picked',
     metricLabel: 'Items picked',
-    secondaryA: { key: 'picks_completed', label: 'picks' },
-    secondaryB: { key: 'items_skipped', label: 'skips' },
     accent: {
       text: 'text-cyan-300',
       bar: 'bg-cyan-400',
@@ -44,9 +40,7 @@ const BOARDS: Record<Mode, BoardConfig> = {
     mode: 'pack',
     label: 'Packing',
     metricKey: 'items_despatched',
-    metricLabel: 'Items despatched',
-    secondaryA: { key: 'packages_despatched', label: 'pkgs' },
-    secondaryB: { key: 'orders_despatched', label: 'orders' },
+    metricLabel: 'Items packed',
     accent: {
       text: 'text-amber-300',
       bar: 'bg-amber-400',
@@ -441,10 +435,6 @@ function MobilePodiumHero({
       <p className="mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-bold uppercase leading-tight text-white">
         {row.picker}
       </p>
-      <div className="mt-1.5 text-xs uppercase tracking-wider text-white/50">
-        {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label} ·{' '}
-        {fmtN(row[board.secondaryB.key] as number)} {board.secondaryB.label}
-      </div>
     </div>
   )
 }
@@ -494,11 +484,6 @@ function MobilePodiumCard({
       >
         {row?.picker ?? '—'}
       </p>
-      {row && (
-        <div className="mt-0.5 truncate text-[10px] uppercase tracking-wider text-white/40">
-          {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label}
-        </div>
-      )}
     </div>
   )
 }
@@ -559,9 +544,8 @@ function PodiumColumn({
                 {fmtN(row[board.metricKey] as number)}
               </span>
             </div>
-            <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/50">
-              {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label} ·{' '}
-              {fmtN(row[board.secondaryB.key] as number)} {board.secondaryB.label}
+            <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">
+              {board.metricLabel}
             </div>
           </>
         ) : (
@@ -616,10 +600,6 @@ function RestRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-base font-bold text-white sm:text-xl xl:text-2xl">
           {row.picker}
-        </div>
-        <div className="mt-0.5 truncate text-[10px] uppercase tracking-wider text-white/40 sm:text-xs">
-          {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label} ·{' '}
-          {fmtN(row[board.secondaryB.key] as number)} {board.secondaryB.label}
         </div>
       </div>
       <div className="text-right">

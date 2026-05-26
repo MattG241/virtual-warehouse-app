@@ -28,8 +28,6 @@ interface MetricCfg {
   primary: keyof LeaderboardRow
   primaryLabel: string
   primaryUnit: string
-  secondaryA: { key: keyof LeaderboardRow; label: string }
-  secondaryB: { key: keyof LeaderboardRow; label: string }
 }
 
 const METRICS: Record<Mode, MetricCfg> = {
@@ -37,15 +35,11 @@ const METRICS: Record<Mode, MetricCfg> = {
     primary: 'items_picked',
     primaryLabel: 'Items picked',
     primaryUnit: 'items',
-    secondaryA: { key: 'picks_completed', label: 'picks' },
-    secondaryB: { key: 'items_skipped', label: 'skips' },
   },
   pack: {
     primary: 'items_despatched',
-    primaryLabel: 'Items despatched',
+    primaryLabel: 'Items packed',
     primaryUnit: 'items',
-    secondaryA: { key: 'packages_despatched', label: 'pkgs' },
-    secondaryB: { key: 'orders_despatched', label: 'orders' },
   },
 }
 
@@ -269,15 +263,11 @@ function RankedList({
                 </div>
               </div>
               <div className="text-right">
-                <div className="tnum text-base font-bold text-ink">
+                <div className="tnum text-xl font-bold text-ink">
                   {fmtN(v)}
-                  <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                    {metric.primaryUnit}
-                  </span>
                 </div>
-                <div className="text-[11px] text-muted">
-                  {fmtN(r[metric.secondaryA.key] as number)} {metric.secondaryA.label} ·{' '}
-                  {fmtN(r[metric.secondaryB.key] as number)} {metric.secondaryB.label}
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  {metric.primaryUnit}
                 </div>
               </div>
             </li>
