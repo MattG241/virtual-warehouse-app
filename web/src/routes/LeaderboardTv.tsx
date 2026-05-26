@@ -85,6 +85,24 @@ const METAL_BY_RANK: Record<number, string> = {
   3: METAL.bronze,
 }
 
+// Gold-glitter image (lives in web/public/). Used for #1 pillar +
+// mobile #1 hero — gives a real photographed sparkle base; the
+// animated shimmer gradient slides over the top.
+const GOLD_GLITTER_URL = '/gold-glitter.jpg'
+
+/** Background-image stack: animated white sheen on top, glitter image
+ *  underneath. The first layer's position is what `metal-shimmer-image`
+ *  animates, so the glitter stays still while the sheen sweeps across. */
+const GOLD_GLITTER_BG: React.CSSProperties = {
+  backgroundImage: `
+    linear-gradient(110deg, transparent 38%, rgba(255,255,255,0.55) 50%, transparent 62%),
+    url(${GOLD_GLITTER_URL})
+  `,
+  backgroundSize: '250% 100%, cover',
+  backgroundPosition: '-150% 0, center',
+  backgroundRepeat: 'no-repeat, no-repeat',
+}
+
 // ─── Component ──────────────────────────────────────────────────────────
 
 export function LeaderboardTv() {
@@ -391,13 +409,18 @@ export function LeaderboardTv() {
           0%, 100% { box-shadow: 0 0 24px -4px rgba(251, 191, 36, 0.45), 0 0 80px -20px rgba(251, 191, 36, 0.35); }
           50%      { box-shadow: 0 0 40px -2px rgba(251, 191, 36, 0.65), 0 0 120px -10px rgba(251, 191, 36, 0.5); }
         }
-        @keyframes sparkleTwinkle {
-          0%, 100% { opacity: 0;   transform: scale(0.6) rotate(0deg); }
-          50%      { opacity: 0.9; transform: scale(1.1) rotate(45deg); }
-        }
         .metal-shimmer {
           background-size: 250% 100%;
           animation: metalShimmer var(--shimmer-duration, 4.5s) linear infinite;
+        }
+        /* Image-backed gold — animates only the first (sheen) layer's
+           background-position. The glitter photo underneath stays put. */
+        @keyframes metalShimmerImage {
+          0%   { background-position: -150% 0, center; }
+          100% { background-position: 250% 0,  center; }
+        }
+        .metal-shimmer-image {
+          animation: metalShimmerImage var(--shimmer-duration, 3.5s) linear infinite;
         }
         .metal-text {
           background-clip: text;
@@ -410,15 +433,6 @@ export function LeaderboardTv() {
         }
         .gold-glow {
           animation: goldGlow 3.2s ease-in-out infinite;
-        }
-        .sparkle {
-          position: absolute;
-          width: 14px; height: 14px;
-          background:
-            linear-gradient(transparent 6px, white 6px, white 8px, transparent 8px),
-            linear-gradient(90deg, transparent 6px, white 6px, white 8px, transparent 8px);
-          pointer-events: none;
-          animation: sparkleTwinkle 2.2s ease-in-out infinite;
         }
       `}</style>
     </div>
@@ -534,15 +548,20 @@ function PodiumColumn({
           'relative w-full overflow-hidden rounded-t-lg ring-1',
           height,
           isLight ? 'ring-slate-200' : 'ring-white/10',
-          row ? 'metal-shimmer' : '',
-          isWinner && row ? 'gold-glow' : '',
+          row && isWinner ? 'metal-shimmer-image gold-glow' : '',
+          row && !isWinner ? 'metal-shimmer' : '',
         )}
         style={
           row
-            ? {
-                backgroundImage: metalGradient,
-                ['--shimmer-duration' as string]: isWinner ? '3.5s' : rank === 2 ? '5s' : '6.5s',
-              }
+            ? isWinner
+              ? {
+                  ...GOLD_GLITTER_BG,
+                  ['--shimmer-duration' as string]: '3.5s',
+                }
+              : {
+                  backgroundImage: metalGradient,
+                  ['--shimmer-duration' as string]: rank === 2 ? '5s' : '6.5s',
+                }
             : { background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)' }
         }
       >
@@ -557,23 +576,13 @@ function PodiumColumn({
               isWinner ? 'text-[14vh]' : rank === 2 ? 'text-[11vh]' : 'text-[9vh]',
             )}
             style={{
-              color: 'rgba(0,0,0,0.18)',
-              textShadow: '0 2px 0 rgba(255,255,255,0.18)',
+              color: 'rgba(0,0,0,0.22)',
+              textShadow: '0 2px 0 rgba(255,255,255,0.25)',
             }}
           >
             {rank}
           </span>
         </div>
-
-        {/* Sparkles on the gold pillar */}
-        {isWinner && row && (
-          <>
-            <Sparkle style={{ top: '18%', left: '24%', animationDelay: '0s' }} />
-            <Sparkle style={{ top: '42%', left: '72%', animationDelay: '0.7s' }} />
-            <Sparkle style={{ top: '68%', left: '40%', animationDelay: '1.4s' }} />
-            <Sparkle style={{ top: '30%', left: '60%', animationDelay: '0.3s', transform: 'scale(0.7)' }} />
-          </>
-        )}
       </div>
     </div>
   )
@@ -593,33 +602,30 @@ function MobilePodiumHero({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl p-5 ring-1 metal-shimmer gold-glow',
-        isLight ? 'ring-amber-300/40' : 'ring-amber-300/30',
+        'relative overflow-hidden rounded-2xl p-5 ring-1 metal-shimmer-image gold-glow',
+        isLight ? 'ring-amber-300/50' : 'ring-amber-300/30',
       )}
       style={{
-        backgroundImage: METAL.gold,
+        ...GOLD_GLITTER_BG,
         ['--shimmer-duration' as string]: '3.5s',
         animation: 'podiumRise 600ms cubic-bezier(0.16,1,0.3,1) both',
       }}
     >
-      <Sparkle style={{ top: '20%', left: '78%' }} />
-      <Sparkle style={{ top: '70%', left: '18%', animationDelay: '1s' }} />
-
       <div className="relative z-10 flex items-start justify-between gap-3">
         <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black/80 px-3 text-xs font-black uppercase tracking-wider text-amber-300 shadow-lg ring-1 ring-amber-300/60">
           <Crown className="h-3.5 w-3.5" />
           #1
         </span>
         <div className="text-right">
-          <div className="tabular-nums text-[clamp(2.4rem,11vw,4rem)] font-black leading-none tracking-tight text-black/90 drop-shadow-[0_2px_0_rgba(255,255,255,0.4)]">
+          <div className="tabular-nums text-[clamp(2.4rem,11vw,4rem)] font-black leading-none tracking-tight text-black/90 drop-shadow-[0_2px_0_rgba(255,255,255,0.5)]">
             {fmtN(row[board.metricKey] as number)}
           </div>
-          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black/60">
+          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black/70">
             {board.metricLabel}
           </div>
         </div>
       </div>
-      <p className="relative z-10 mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">
+      <p className="relative z-10 mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
         {row.picker}
       </p>
     </div>
@@ -710,10 +716,6 @@ function MedalChip({ rank }: { rank: number }) {
       #3
     </span>
   )
-}
-
-function Sparkle({ style }: { style?: React.CSSProperties }) {
-  return <span className="sparkle" style={style} aria-hidden />
 }
 
 function RestRow({
