@@ -224,29 +224,34 @@ app.get('/api/leaderboard', async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
   const mode = String(req.query.mode || 'diff');
 
-  // Raw mode: return the latest snapshot per picker verbatim. Useful when
-  // the PVX template already has the right time filter baked in (e.g.
-  // "User activity - Today") so no diff is needed.
+  // Raw mode: return rows from the *single most recent* sync run, verbatim.
+  // All rows inserted in one runPickSync() call share the exact same
+  // snapshot_at, so we can grab them with `= MAX(snapshot_at)`. This avoids
+  // mixing snapshots from different templates / time filters.
   if (mode === 'raw') {
     try {
       const r = await pool.query(
-        `SELECT DISTINCT ON (picker)
-                picker,
+        `WITH latest_ts AS (
+           SELECT MAX(snapshot_at) AS ts FROM pick_user_totals
+         )
+         SELECT picker,
                 items_picked       AS units,
                 picks_completed    AS lines,
                 orders_despatched  AS orders,
                 items_skipped, containers_moved, item_movements,
                 items_moved, packages_despatched, items_despatched,
                 snapshot_at
-           FROM pick_user_totals
-          ORDER BY picker, snapshot_at DESC`,
+           FROM pick_user_totals, latest_ts
+          WHERE snapshot_at = latest_ts.ts
+          ORDER BY units DESC, lines DESC
+          LIMIT $1`,
+        [limit],
       );
-      const sorted = r.rows.sort((a, b) => b.units - a.units).slice(0, limit);
       res.set('Cache-Control', 'no-store');
       res.json({
         mode: 'raw',
         configured: Boolean(config.pvx.pickTemplate),
-        rows: sorted,
+        rows: r.rows,
         totalRows: r.rows.length,
         latest: r.rows.length ? r.rows[0].snapshot_at : null,
       });
