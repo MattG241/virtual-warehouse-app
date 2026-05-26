@@ -260,7 +260,7 @@ export function LeaderboardTv() {
   }
 
   return (
-    <div className={cn('fixed inset-0 z-50 overflow-hidden transition-colors duration-500', t.bg, t.text)}>
+    <div className={cn('fixed inset-0 z-50 overflow-y-auto overflow-x-hidden transition-colors duration-500 md:overflow-hidden', t.bg, t.text)}>
       {/* Soft ambient spotlight in the active board's accent colour */}
       <div
         className="pointer-events-none absolute inset-0 transition-[background] duration-700"
@@ -285,7 +285,7 @@ export function LeaderboardTv() {
         <X className="h-4 w-4 sm:h-5 sm:w-5" />
       </button>
 
-      <div className="relative z-10 flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6 xl:p-8">
+      <div className="relative z-10 flex min-h-screen flex-col gap-3 p-4 sm:gap-4 sm:p-6 md:h-full md:min-h-0 md:overflow-hidden xl:p-8">
         {/* ── Header ───────────────────────────────────────────────── */}
         <header className={cn('flex flex-shrink-0 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between', t.border)}>
           <div className="flex items-center gap-3 sm:gap-5">
@@ -355,7 +355,7 @@ export function LeaderboardTv() {
         )}
 
         {/* ── Main ─────────────────────────────────────────────────── */}
-        <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
+        <main className="flex flex-1 flex-col gap-3 sm:gap-4 md:min-h-0 md:overflow-hidden">
           {err ? (
             <Centered>
               <p className={cn('text-2xl', t.textMuted)}>{err}</p>
@@ -388,7 +388,7 @@ export function LeaderboardTv() {
             <>
               <Podium top={topThree} board={board} isLight={isLight} win={win} key={`${mode}-${win}-podium`} />
               {rest.length > 0 && (
-                <ol className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-hidden xl:grid-cols-2 xl:gap-3">
+                <ol className="grid grid-cols-1 content-start gap-2 md:min-h-0 md:flex-1 md:overflow-hidden xl:grid-cols-2 xl:gap-3">
                   {rest.map((r, i) => (
                     <RestRow
                       key={`${mode}-${win}-${r.picker}`}
