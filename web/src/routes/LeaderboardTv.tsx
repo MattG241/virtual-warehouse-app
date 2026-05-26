@@ -196,6 +196,35 @@ export function LeaderboardTv() {
     return () => window.removeEventListener('keydown', handler)
   }, [navigate])
 
+  // Double-click anywhere outside the toggles toggles fullscreen — easiest
+  // way to get the warehouse TV into a chromeless display without keyboard.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      // Don't hijack double-clicks on interactive controls (pill toggles,
+      // window switcher, close button) — those should keep their native
+      // behaviour.
+      if ((e.target as HTMLElement | null)?.closest?.('button')) return
+      const fsEl =
+        document.fullscreenElement ||
+        // Safari prefix — kept for older WebKit
+        (document as Document & { webkitFullscreenElement?: Element })
+          .webkitFullscreenElement
+      const target = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>
+      }
+      const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>
+      }
+      if (fsEl) {
+        (doc.exitFullscreen?.() || doc.webkitExitFullscreen?.())?.catch?.(() => undefined)
+      } else {
+        (target.requestFullscreen?.() || target.webkitRequestFullscreen?.())?.catch?.(() => undefined)
+      }
+    }
+    document.addEventListener('dblclick', handler)
+    return () => document.removeEventListener('dblclick', handler)
+  }, [])
+
   const board = BOARDS[mode]
   const windowMeta = WINDOWS.find((w) => w.key === win)!
   const winConfigured = data[`${win}_configured` as const]
