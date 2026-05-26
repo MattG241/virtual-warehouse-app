@@ -29,6 +29,16 @@ export function parseCode(code: string) {
   }
 }
 
+// Canonical slot key: aisle/bay/level zero-padded to 2 digits, slot NOT padded.
+// Accepts loose user / scanner input — "A3.B06.L05.S6", "A03.B6.L5.S06",
+// lower-case, surrounding whitespace — and returns the form the server emits
+// in `inventory.grid`. Returns null if the input doesn't look like a slot code.
+export function normalizeLocationCode(raw: string): string | null {
+  const m = CODE_RE.exec(raw.trim())
+  if (!m) return null
+  return `A${String(Number(m[1])).padStart(2, '0')}.B${String(Number(m[2])).padStart(2, '0')}.L${String(Number(m[3])).padStart(2, '0')}.S${Number(m[4])}`
+}
+
 /** All physical slots, derived from aisleBays × levels × slots, merged with
  *  whatever grid actually carries stock. Stable across renders. */
 export function allSlots(inv: Inventory): SlotSummary[] {
