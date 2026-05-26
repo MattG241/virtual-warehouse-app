@@ -366,11 +366,20 @@ async function bulkInsertPickTotals(tx, rows, windowKey) {
 // PVX_OPEN_ORDERS_TEMPLATE — blank == feature off.
 
 let orderSnapRunning = false
-export async function runOrderSnapshot() {
+export async function runOrderSnapshot(opts = {}) {
   const template = config.pvx.openOrdersTemplate;
   if (!template) return { skipped: 'PVX_OPEN_ORDERS_TEMPLATE not set' };
   if (orderSnapRunning) return { skipped: 'previous order snapshot still running' };
   orderSnapRunning = true;
+
+  // Caller can ask us to drop today's baseline before snapshotting — handy
+  // after swapping the open-orders template and you want today's bar
+  // denominator to be set by the new report.
+  if (opts.resetTodayBaseline) {
+    const { date: localDate } = warehouseDateParts();
+    await pool.query(`DELETE FROM order_baselines WHERE day = $1::date`, [localDate]);
+    console.log(`[order-snap] reset today's baseline (${localDate})`);
+  }
 
   const startedAt = Date.now();
   console.log(`[order-snap] starting template="${template}"`);

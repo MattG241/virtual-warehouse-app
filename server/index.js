@@ -199,10 +199,14 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
   }
 });
 
-app.post('/api/orders/sync-now', express.json(), async (_req, res) => {
+app.post('/api/orders/sync-now', express.json(), async (req, res) => {
+  // ?reset=1 wipes today's baseline before snapshotting — use after
+  // swapping the open-orders template so the bar's denominator picks
+  // up the new report's count immediately.
+  const resetTodayBaseline = String(req.query.reset || '') === '1';
   try {
-    const result = await runOrderSnapshot();
-    res.json({ ok: true, ...result });
+    const result = await runOrderSnapshot({ resetTodayBaseline });
+    res.json({ ok: true, reset: resetTodayBaseline, ...result });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
