@@ -62,12 +62,24 @@ export function Topbar({ title }: Props) {
   return (
     <header className="sticky top-0 z-30 -mx-4 mb-5 flex items-center gap-3 border-b border-line/60 bg-bg/80 px-4 py-3 backdrop-blur-xl sm:mx-0 sm:rounded-xl sm:border sm:border-line sm:px-5">
       <div className="min-w-0 flex-1">
-        {/* Eyebrow only on desktop — mobile gets the iOS-style single-line
-            navigation title for a cleaner phone chrome. */}
+        {/* Mobile: show the brand mark instead of a truncated page title.
+            The current section is already obvious from the bottom tab bar
+            + the page's own eyebrow, so the topbar gets the brand and a
+            cleaner phone chrome. */}
+        <div className="sm:hidden flex items-center gap-2 min-w-0">
+          <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-brand-grad shadow-glow">
+            <img
+              src="/ryderwear-mark.png"
+              alt="Ryderwear"
+              className="h-6 w-6 object-contain"
+              draggable={false}
+            />
+          </div>
+        </div>
         <p className="hidden sm:block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
           Warehouse OS
         </p>
-        <h2 className="truncate text-[20px] font-bold tracking-tight text-ink sm:text-xl sm:font-semibold">
+        <h2 className="hidden sm:block truncate text-xl font-semibold tracking-tight text-ink">
           {title}
         </h2>
       </div>
