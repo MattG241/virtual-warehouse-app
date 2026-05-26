@@ -110,6 +110,8 @@ export async function runSyncOnce() {
     // logged but never rethrown — alerting must not break the sync result.
     postStockDeltas(runId);
     postAisleFullness(runId);
+    // Pick activity sync is best-effort and isolated — never breaks inventory.
+    runPickSync().catch((e) => console.error('[pick-sync] failed:', e.message));
     return { runId, rowCount: finalRows.length };
   } catch (err) {
     console.error(`[sync] run #${runId} failed:`, err.message);
@@ -185,6 +187,135 @@ async function bulkInsert(tx, rows) {
     await tx.query(
       `INSERT INTO stock_items
         (item_code, item_name, stock_count, container_barcode, location_barcode, site_reference, location_type, item_type_group, item_barcode)
+       VALUES ${values.join(',')}`,
+      params,
+    );
+  }
+}
+
+// --- Pick activity sync ---------------------------------------------------
+// Pulls a separate PVX report template (e.g. "Pick activity by user") into
+// the pick_activity table. Opt-in via PVX_PICK_TEMPLATE — if blank, this is
+// a no-op. Truncate + bulk insert, same model as the inventory sync.
+let pickRunning = false;
+export async function runPickSync() {
+  if (!config.pvx.pickTemplate) return { skipped: 'PVX_PICK_TEMPLATE not set' };
+  if (pickRunning) return { skipped: 'previous pick sync still running' };
+  pickRunning = true;
+
+  const startedAt = Date.now();
+  console.log(`[pick-sync] starting template="${config.pvx.pickTemplate}"`);
+
+  try {
+    const pvx = new PvxClient(config.pvx);
+    const rows = [];
+    let header = null;
+
+    for await (const event of pvx.iterateAllRows({
+      template: config.pvx.pickTemplate,
+      columns: config.pvx.pickColumns,
+      pageSize: config.sync.pageSize,
+      pageDelayMs: config.sync.pageDelayMs,
+    })) {
+      if (event.header) {
+        header = event.header;
+        continue;
+      }
+      if (event.row) rows.push(event.row);
+    }
+
+    if (!header) {
+      console.log('[pick-sync] no header returned — leaving table as-is');
+      return { skipped: 'no header' };
+    }
+
+    const idx = buildColumnIndex(header);
+    const userCol = config.pvx.pickUserCol;
+    const unitsCol = config.pvx.pickUnitsCol;
+    const tsCol = config.pvx.pickTimestampCol;
+    const orderCol = config.pvx.pickOrderCol;
+
+    const missing = [userCol, unitsCol, tsCol].filter((n) => !(n in idx));
+    if (missing.length) {
+      throw new Error(
+        `pick template missing required columns: ${missing.join(', ')}. ` +
+          `Available: ${Object.keys(idx).join(', ')}`,
+      );
+    }
+
+    const mapped = rows
+      .map((r) => {
+        const ts = parsePvxDate(r[idx[tsCol]]);
+        if (!ts) return null;
+        const picker = String(r[idx[userCol]] ?? '').trim();
+        if (!picker) return null;
+        return {
+          picker,
+          order_number: orderCol in idx ? String(r[idx[orderCol]] ?? '').trim() : '',
+          item_code: 'Item Code' in idx ? String(r[idx['Item Code']] ?? '').trim() : '',
+          units: toInt(r[idx[unitsCol]]),
+          picked_at: ts,
+        };
+      })
+      .filter(Boolean);
+
+    const tx = await pool.connect();
+    try {
+      await tx.query('BEGIN');
+      await tx.query('TRUNCATE TABLE pick_activity');
+      await bulkInsertPicks(tx, mapped);
+      await tx.query('COMMIT');
+    } catch (e) {
+      await tx.query('ROLLBACK');
+      throw e;
+    } finally {
+      tx.release();
+    }
+
+    console.log(
+      `[pick-sync] ok — ${mapped.length} pick rows in ${Date.now() - startedAt}ms`,
+    );
+    publish('picks.completed', {
+      rowCount: mapped.length,
+      finishedAt: new Date().toISOString(),
+    });
+    return { rowCount: mapped.length };
+  } finally {
+    pickRunning = false;
+  }
+}
+
+function parsePvxDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // Native first — handles ISO and "YYYY-MM-DD HH:mm:ss".
+  let d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+  // Common PVX format: DD/MM/YYYY HH:mm:ss (AU locale).
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const [, dd, mm, yyyy, hh = '0', mi = '0', ss = '0'] = m;
+    d = new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi, +ss));
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  return null;
+}
+
+async function bulkInsertPicks(tx, rows) {
+  if (!rows.length) return;
+  const chunkSize = 500;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const values = [];
+    const params = [];
+    chunk.forEach((r, j) => {
+      const o = j * 5;
+      values.push(`($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5})`);
+      params.push(r.picker, r.order_number, r.item_code, r.units, r.picked_at);
+    });
+    await tx.query(
+      `INSERT INTO pick_activity (picker, order_number, item_code, units, picked_at)
        VALUES ${values.join(',')}`,
       params,
     );

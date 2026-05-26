@@ -72,6 +72,28 @@ Add these to Railway → service → **Variables**:
 
 That's it — no external email service required. Passwords are hashed with scrypt (Node built-in) and stored in the `users` table. Anyone whose email is in `ALLOWED_EMAILS` can hit **Sign in → Create one** on first visit, pick a password, and they're in. Subsequent visits use email + password.
 
+### Picking leaderboard (optional)
+
+The dashboard can also rank pickers by units picked over Today / Last 7d / Last 30d windows. It's off by default — set `PVX_PICK_TEMPLATE` to a PVX report that surfaces per-pick rows with a picker, quantity, and timestamp:
+
+| Variable                  | Value                                                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `PVX_PICK_TEMPLATE`       | Name of the PVX report template (e.g. `Pick activity by user`). Leave blank to disable the leaderboard.        |
+| `PVX_PICK_COLUMNS`        | Default: `[Picked by],[Order Number],[Item Code],[Quantity],[Picked on]`. Adjust to match your template.       |
+| `PVX_PICK_USER_COL`       | Column name (inside `PVX_PICK_COLUMNS`) holding the picker. Default `Picked by`.                               |
+| `PVX_PICK_UNITS_COL`      | Column holding units per pick. Default `Quantity`.                                                             |
+| `PVX_PICK_TIMESTAMP_COL`  | Column holding the pick timestamp. Default `Picked on`. Accepts ISO or `DD/MM/YYYY HH:mm:ss`.                  |
+| `PVX_PICK_ORDER_COL`      | Column holding the order number, used to count distinct orders. Default `Order Number`. Optional.              |
+
+The pick sync runs after each inventory sync (same 5-min cadence) using a TRUNCATE + bulk insert into `pick_activity`. The leaderboard endpoint then aggregates by picker and time window.
+
+Endpoints:
+
+- `GET /api/leaderboard?window=today|week|month&limit=10` — ranked list `[{picker, units, lines, orders}]`. The `configured`, `totalRows`, and `latest` fields help the UI distinguish "not set up" from "no data yet".
+- `POST /api/picks/sync-now` — kick off a one-off pick sync (handy after changing the template/columns env vars).
+
+If your PVX tenant uses different column headers, set `PVX_PICK_COLUMNS` to whatever your template exposes and point the `*_COL` env vars at the matching headers. The first sync will log the full available header list if columns are missing, so you can copy the exact names.
+
 ### Slack alerts (optional)
 
 Create an Incoming Webhook in your Slack workspace (Apps → Incoming Webhooks → Add to Slack → pick a channel). Drop the URL into Railway:
@@ -109,6 +131,8 @@ If `SLACK_WEBHOOK_URL` is unset, the alerts log to the server console instead so
 - `POST /api/auth/logout` — clears the session cookie.
 - `GET /api/audit?limit=N` — audit log (requires auth).
 - `PUT /api/layout` — saves the warehouse layout (requires auth).
+- `GET /api/leaderboard?window=today|week|month` — picker leaderboard (see Picking leaderboard section).
+- `POST /api/picks/sync-now` — kick off a one-off pick activity sync.
 
 ## Known gotchas, baked in
 

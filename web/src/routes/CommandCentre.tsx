@@ -25,6 +25,7 @@ import {
 } from '@/lib/inventory'
 import { fetchSyncStatus, type SyncRun } from '@/lib/api'
 import { useDashboard, type WidgetKey } from '@/features/dashboard/store'
+import { LeaderboardWidget } from '@/features/dashboard/LeaderboardWidget'
 import { cn } from '@/lib/cn'
 
 export function CommandCentre() {
@@ -58,6 +59,8 @@ function WidgetRender({ k }: { k: WidgetKey }) {
       return <TopSkusWidget />
     case 'aisleHealth':
       return <AisleHealthWidget />
+    case 'leaderboard':
+      return <LeaderboardWidget />
     case 'syncHistory':
       return <SyncHistoryWidget />
     default:

@@ -7,6 +7,7 @@ export type WidgetKey =
   | 'topSkus'
   | 'aisleHealth'
   | 'syncHistory'
+  | 'leaderboard'
 
 export interface Widget {
   key: WidgetKey
@@ -19,6 +20,7 @@ export const defaultWidgets: Widget[] = [
   { key: 'lowStock', label: 'Low stock alerts', visible: true },
   { key: 'topSkus', label: 'Top SKUs by units', visible: true },
   { key: 'aisleHealth', label: 'Aisle health', visible: true },
+  { key: 'leaderboard', label: 'Picker leaderboard', visible: true },
   { key: 'syncHistory', label: 'Sync history', visible: true },
 ]
 

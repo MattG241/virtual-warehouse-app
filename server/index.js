@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { initSchema, pool } from './db.js';
-import { startSyncLoop, runSyncOnce } from './sync.js';
+import { startSyncLoop, runSyncOnce, runPickSync } from './sync.js';
 import { buildWarehouseData } from './shape.js';
 import { attachSseRoute, publish } from './events.js';
 import { attachExportRoutes } from './export.js';
@@ -196,6 +196,56 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
     res.json({ ok: true, ...result });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.post('/api/picks/sync-now', express.json(), async (_req, res) => {
+  try {
+    const result = await runPickSync();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  const allowed = new Set(['today', 'week', 'month']);
+  const windowKey = allowed.has(String(req.query.window)) ? req.query.window : 'today';
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+
+  const sinceClause = {
+    today: "picked_at >= date_trunc('day', NOW())",
+    week: "picked_at >= NOW() - INTERVAL '7 days'",
+    month: "picked_at >= NOW() - INTERVAL '30 days'",
+  }[windowKey];
+
+  try {
+    const r = await pool.query(
+      `SELECT picker,
+              SUM(units)::int                     AS units,
+              COUNT(*)::int                       AS lines,
+              COUNT(DISTINCT NULLIF(order_number, ''))::int AS orders
+         FROM pick_activity
+        WHERE ${sinceClause}
+        GROUP BY picker
+        ORDER BY units DESC, lines DESC
+        LIMIT $1`,
+      [limit],
+    );
+    const totals = await pool.query(
+      `SELECT COUNT(*)::int AS total_rows, MAX(picked_at) AS latest FROM pick_activity`,
+    );
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      window: windowKey,
+      configured: Boolean(config.pvx.pickTemplate),
+      rows: r.rows,
+      totalRows: totals.rows[0]?.total_rows || 0,
+      latest: totals.rows[0]?.latest || null,
+    });
+  } catch (e) {
+    console.error('[api/leaderboard] error:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 

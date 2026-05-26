@@ -120,6 +120,37 @@ export async function fetchSyncStatus(): Promise<{ runs: SyncRun[] }> {
   return res.json()
 }
 
+export type LeaderboardWindow = 'today' | 'week' | 'month'
+
+export interface LeaderboardRow {
+  picker: string
+  units: number
+  lines: number
+  orders: number
+}
+
+export interface LeaderboardResponse {
+  window: LeaderboardWindow
+  configured: boolean
+  rows: LeaderboardRow[]
+  totalRows: number
+  latest: string | null
+}
+
+/** Returns null if the backend has no leaderboard endpoint (e.g. older deploys). */
+export async function fetchLeaderboard(
+  win: LeaderboardWindow,
+  signal?: AbortSignal,
+): Promise<LeaderboardResponse | null> {
+  const res = await fetch(
+    `${BASE}/api/leaderboard?window=${encodeURIComponent(win)}`,
+    { credentials: 'include', cache: 'no-store', signal },
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`/api/leaderboard ${res.status}`)
+  return res.json()
+}
+
 /** Opens an EventSource to /api/events. Returns a cleanup function. */
 export function openEvents(handlers: {
   onSyncCompleted?: (e: { rowCount: number; finishedAt: string }) => void

@@ -67,5 +67,17 @@ export async function initSchema() {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_login_at TIMESTAMPTZ
     );
+
+    CREATE TABLE IF NOT EXISTS pick_activity (
+      id            BIGSERIAL PRIMARY KEY,
+      picker        TEXT NOT NULL,
+      order_number  TEXT NOT NULL DEFAULT '',
+      item_code     TEXT NOT NULL DEFAULT '',
+      units         INTEGER NOT NULL DEFAULT 0,
+      picked_at     TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS pick_activity_picked_at_idx ON pick_activity(picked_at DESC);
+    CREATE INDEX IF NOT EXISTS pick_activity_picker_idx ON pick_activity(picker);
   `);
 }
