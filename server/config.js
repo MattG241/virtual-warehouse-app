@@ -47,6 +47,10 @@ function loadConfig() {
     },
     warehouseTz: process.env.WAREHOUSE_TZ || 'Australia/Adelaide',
     baselineHour: Number(process.env.ORDER_BASELINE_HOUR || 8),
+    // Second baseline of the day — re-captures outstanding orders so the
+    // bar shows post-afternoon-cutoff progress instead of carrying the
+    // morning denominator. Default 4pm. Set to 0 to disable.
+    resetHour: Number(process.env.ORDER_RESET_HOUR || 16),
     sync: {
       intervalMs: Number(process.env.SYNC_INTERVAL_MS || 300000),
       pageSize: Number(process.env.SYNC_PAGE_SIZE || 1000),

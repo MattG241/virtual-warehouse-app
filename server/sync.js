@@ -413,15 +413,41 @@ export async function runOrderSnapshot(opts = {}) {
       [openCount],
     );
 
-    // Capture today's baseline if we're past the threshold and don't have one.
+    // Baseline lifecycle each day:
+    //   • At/after baselineHour (8am default) — first sync inserts the
+    //     morning denominator. Subsequent syncs leave it alone.
+    //   • At/after resetHour (4pm default, if non-zero) — first sync past
+    //     this point OVERWRITES the existing baseline with the current
+    //     open count, so the bar restarts at 0% for the afternoon shift.
     const { date: localDate, hour: localHour } = warehouseDateParts();
-    if (localHour >= config.baselineHour) {
+    const resetHour = config.resetHour;
+    const existing = await pool.query(
+      `SELECT baseline_count, captured_at FROM order_baselines WHERE day = $1::date`,
+      [localDate],
+    );
+    const haveBaseline = existing.rows.length > 0;
+    const baselineCapturedHour = haveBaseline
+      ? warehouseDatePartsFor(new Date(existing.rows[0].captured_at)).hour
+      : null;
+    const pastResetCutoff = resetHour > 0 && localHour >= resetHour;
+    const baselineIsPreReset = baselineCapturedHour != null && baselineCapturedHour < resetHour;
+
+    if (!haveBaseline && localHour >= config.baselineHour) {
       await pool.query(
         `INSERT INTO order_baselines (day, baseline_count, captured_at)
          VALUES ($1::date, $2, NOW())
          ON CONFLICT (day) DO NOTHING`,
         [localDate, openCount],
       );
+      console.log(`[order-snap] morning baseline captured: ${openCount}`);
+    } else if (haveBaseline && pastResetCutoff && baselineIsPreReset) {
+      await pool.query(
+        `UPDATE order_baselines
+            SET baseline_count = $1, captured_at = NOW()
+          WHERE day = $2::date`,
+        [openCount, localDate],
+      );
+      console.log(`[order-snap] afternoon baseline reset at ${resetHour}:00 — ${openCount}`);
     }
 
     console.log(
@@ -437,19 +463,23 @@ export async function runOrderSnapshot(opts = {}) {
   }
 }
 
-function warehouseDateParts() {
+function warehouseDatePartsFor(date) {
   const fmt = new Intl.DateTimeFormat('en-AU', {
     timeZone: config.warehouseTz,
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', hour12: false,
   });
   const parts = Object.fromEntries(
-    fmt.formatToParts(new Date()).map((p) => [p.type, p.value]),
+    fmt.formatToParts(date).map((p) => [p.type, p.value]),
   );
   return {
     date: `${parts.year}-${parts.month}-${parts.day}`,
     hour: parseInt(parts.hour, 10) || 0,
   };
+}
+
+function warehouseDateParts() {
+  return warehouseDatePartsFor(new Date());
 }
 
 // CLI: node server/sync.js --once
