@@ -558,7 +558,9 @@ function PodiumColumn({
               className={cn(
                 'font-bold uppercase leading-tight',
                 isLight ? 'text-slate-900' : 'text-white',
-                isWinner ? 'text-[clamp(1.8rem,3vw,3rem)]' : 'text-[clamp(1.2rem,2vw,2rem)]',
+                isWinner
+                  ? 'text-[clamp(2.6rem,4.4vw,4.5rem)]'
+                  : 'text-[clamp(1.8rem,3vw,3rem)]',
               )}
             >
               {row.picker}
@@ -590,7 +592,7 @@ function PodiumColumn({
               isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/30')}>
               #{rank}
             </span>
-            <p className={cn('text-[clamp(1.2rem,2vw,2rem)] font-bold', isLight ? 'text-slate-300' : 'text-white/30')}>—</p>
+            <p className={cn('text-[clamp(1.8rem,3vw,3rem)] font-bold', isLight ? 'text-slate-300' : 'text-white/30')}>—</p>
             <p className={cn('mt-2 text-[clamp(2rem,3vw,3rem)] font-black', isLight ? 'text-slate-200' : 'text-white/20')}>—</p>
           </>
         )}
@@ -684,7 +686,7 @@ function MobilePodiumHero({
           </div>
         </div>
       </div>
-      <p className="relative z-10 mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+      <p className="relative z-10 mt-4 text-[clamp(1.8rem,7vw,2.8rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
         {row.picker}
       </p>
     </div>
@@ -731,7 +733,7 @@ function MobilePodiumCard({
         </span>
       </div>
       <p className={cn(
-        'relative z-10 mt-2 truncate text-base font-black uppercase leading-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.25)]',
+        'relative z-10 mt-2 truncate text-xl font-black uppercase leading-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.25)] sm:text-2xl',
         row ? textColor : 'text-white/40',
       )}>
         {row?.picker ?? '—'}
@@ -804,7 +806,7 @@ function RestRow({
         {rank}
       </span>
       <div className="min-w-0 flex-1">
-        <div className={cn('truncate text-base font-bold sm:text-xl xl:text-2xl',
+        <div className={cn('truncate text-xl font-bold sm:text-2xl xl:text-3xl',
           isLight ? 'text-slate-900' : 'text-white')}>
           {row.picker}
         </div>
