@@ -208,6 +208,40 @@ app.post('/api/orders/sync-now', express.json(), async (_req, res) => {
   }
 });
 
+// Diagnostic: hit a PVX template directly and return what came back.
+// Useful when a configured template returns 0 rows unexpectedly — lets
+// us see the raw header + first few rows of the CSV PVX gave us.
+app.get('/api/debug/pvx-report', async (req, res) => {
+  const template = String(req.query.template || '');
+  const columns = String(req.query.columns || '[Order Number]');
+  if (!template) {
+    res.status(400).json({ error: 'template query param required' });
+    return;
+  }
+  try {
+    const { PvxClient } = await import('./pvx.js');
+    const pvx = new PvxClient(config.pvx);
+    const { totalCount, csv } = await pvx.getReportPage({
+      template,
+      columns,
+      pageNo: 1,
+      pageSize: 10,
+    });
+    // Truncate the body so a huge report doesn't blow up the response.
+    const preview = csv.length > 4000 ? csv.slice(0, 4000) + '\n…(truncated)' : csv;
+    res.json({
+      template,
+      columns,
+      totalCount,
+      csvLength: csv.length,
+      csvPreview: preview,
+    });
+  } catch (e) {
+    console.error('[debug/pvx-report] error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/orders/progress', async (_req, res) => {
   const configured = Boolean(config.pvx.openOrdersTemplate);
   try {
