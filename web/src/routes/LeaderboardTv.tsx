@@ -3,6 +3,7 @@ import { Trophy, Package, PackageCheck, X, Crown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { fetchLeaderboard, type LeaderboardRow, type LeaderboardWindow } from '@/lib/api'
+import { useTheme } from '@/store/theme'
 
 // ─── Config ─────────────────────────────────────────────────────────────
 
@@ -16,23 +17,26 @@ interface BoardConfig {
   label: string
   metricKey: keyof LeaderboardRow
   metricLabel: string
-  accent: { text: string; bar: string; chip: string; ring: string }
+  /** Category accent colour (cyan for pick, amber for pack) per theme */
+  accent: { dark: string; light: string }
+  /** Bar colour shown on cycle indicator dots */
+  bar: string
+  /** Ambient radial-glow rgba for the body background */
+  glow: { dark: string; light: string }
   Icon: typeof Package
 }
 
-// Professional palette — restrained accent colours, dark consistent BG.
-// Picking → cool teal/cyan. Packing → warm amber.
 const BOARDS: Record<Mode, BoardConfig> = {
   pick: {
     mode: 'pick',
     label: 'Picking',
     metricKey: 'items_picked',
     metricLabel: 'Items picked',
-    accent: {
-      text: 'text-cyan-300',
-      bar: 'bg-cyan-400',
-      chip: 'bg-cyan-400/15 text-cyan-200 ring-1 ring-cyan-300/30',
-      ring: 'ring-cyan-300/40',
+    accent: { dark: 'text-cyan-300', light: 'text-cyan-700' },
+    bar: 'bg-cyan-400',
+    glow: {
+      dark: 'rgba(34, 211, 238, 0.18)',
+      light: 'rgba(8, 145, 178, 0.10)',
     },
     Icon: Package,
   },
@@ -41,11 +45,11 @@ const BOARDS: Record<Mode, BoardConfig> = {
     label: 'Packing',
     metricKey: 'items_despatched',
     metricLabel: 'Items packed',
-    accent: {
-      text: 'text-amber-300',
-      bar: 'bg-amber-400',
-      chip: 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/30',
-      ring: 'ring-amber-300/40',
+    accent: { dark: 'text-amber-300', light: 'text-amber-700' },
+    bar: 'bg-amber-400',
+    glow: {
+      dark: 'rgba(251, 191, 36, 0.18)',
+      light: 'rgba(217, 119, 6, 0.10)',
     },
     Icon: PackageCheck,
   },
@@ -57,10 +61,36 @@ const WINDOWS: { key: LeaderboardWindow; label: string; sub: string }[] = [
   { key: 'month', label: 'Month to date', sub: 'This month' },
 ]
 
+// Metallic gradients for podium pillars + score text. Each metal has a
+// fully-saturated "edge" pair and a hot highlight near 50% that the
+// shimmer animation slides through.
+const METAL = {
+  gold: `linear-gradient(110deg,
+    #92400e 0%,   #d97706 18%,  #fbbf24 38%,
+    #fef3c7 48%,  #ffffff 50%,  #fef3c7 52%,
+    #fbbf24 62%,  #d97706 82%,  #92400e 100%)`,
+  silver: `linear-gradient(110deg,
+    #475569 0%,   #94a3b8 18%,  #cbd5e1 38%,
+    #f1f5f9 48%,  #ffffff 50%,  #f1f5f9 52%,
+    #cbd5e1 62%,  #94a3b8 82%,  #475569 100%)`,
+  bronze: `linear-gradient(110deg,
+    #431407 0%,   #78350f 18%,  #b45309 38%,
+    #d97706 48%,  #fbbf24 50%,  #d97706 52%,
+    #b45309 62%,  #78350f 82%,  #431407 100%)`,
+}
+
+const METAL_BY_RANK: Record<number, string> = {
+  1: METAL.gold,
+  2: METAL.silver,
+  3: METAL.bronze,
+}
+
 // ─── Component ──────────────────────────────────────────────────────────
 
 export function LeaderboardTv() {
   const navigate = useNavigate()
+  const themeMode = useTheme((s) => s.mode)
+  const isLight = themeMode === 'light'
   const [mode, setMode] = useState<Mode>('pick')
   const [win, setWin] = useState<LeaderboardWindow>('today')
   const [data, setData] = useState<{
@@ -77,9 +107,8 @@ export function LeaderboardTv() {
     latest: null,
   })
   const [err, setErr] = useState<string | null>(null)
-  const [, setTick] = useState(0) // forces clock re-renders every second
+  const [, setTick] = useState(0)
 
-  // Fetch all three windows in parallel, refresh every 30s
   useEffect(() => {
     let cancelled = false
     const load = () => {
@@ -112,18 +141,10 @@ export function LeaderboardTv() {
       return ctl
     }
     let ctl = load()
-    const id = setInterval(() => {
-      ctl.abort()
-      ctl = load()
-    }, REFRESH_MS)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-      ctl.abort()
-    }
+    const id = setInterval(() => { ctl.abort(); ctl = load() }, REFRESH_MS)
+    return () => { cancelled = true; clearInterval(id); ctl.abort() }
   }, [])
 
-  // Auto-cycle mode (pick ↔ pack)
   useEffect(() => {
     const id = setInterval(() => {
       setMode((m) => (m === 'pick' ? 'pack' : 'pick'))
@@ -131,13 +152,11 @@ export function LeaderboardTv() {
     return () => clearInterval(id)
   }, [])
 
-  // Clock tick
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1_000)
     return () => clearInterval(id)
   }, [])
 
-  // Esc → close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') navigate('/')
@@ -168,27 +187,36 @@ export function LeaderboardTv() {
 
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })
-  const dateStr = now.toLocaleDateString('en-AU', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  })
+  const dateStr = now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  // Theme-aware tokens — defined once so the JSX stays readable
+  const t = {
+    bg:           isLight ? 'bg-[#f4f6fa]' : 'bg-[#070a13]',
+    text:         isLight ? 'text-slate-900' : 'text-white',
+    textMuted:    isLight ? 'text-slate-500' : 'text-white/50',
+    textSubtle:   isLight ? 'text-slate-400' : 'text-white/40',
+    border:       isLight ? 'border-slate-200' : 'border-white/10',
+    cardBg:       isLight ? 'bg-white/70' : 'bg-white/[0.04]',
+    cardRing:     isLight ? 'ring-slate-200/70' : 'ring-white/10',
+    chipBg:       isLight ? 'bg-slate-100' : 'bg-white/[0.04]',
+    iconBg:       isLight ? 'bg-slate-100' : 'bg-white/[0.06]',
+    iconRing:     isLight ? 'ring-slate-200' : 'ring-white/10',
+    pillActive:   isLight ? 'bg-slate-900 text-white' : 'bg-white text-black',
+    pillIdle:     isLight ? 'text-slate-500 hover:text-slate-900' : 'text-white/60 hover:text-white',
+    closeBg:      isLight ? 'bg-white text-slate-500 ring-slate-200' : 'bg-white/[0.04] text-white/50 ring-white/10',
+    closeHover:   isLight ? 'hover:bg-slate-100 hover:text-slate-900' : 'hover:bg-white/10 hover:text-white',
+    metricLabel:  isLight ? 'text-slate-500' : 'text-white/40',
+  }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-[#070a13] text-white">
-      {/* Subtle radial vignette */}
+    <div className={cn('fixed inset-0 z-50 overflow-y-auto overflow-x-hidden transition-colors duration-500', t.bg, t.text)}>
+      {/* Soft ambient spotlight in the active board's accent colour */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 transition-[background] duration-700"
         style={{
-          background:
-            'radial-gradient(ellipse at top, rgba(255,255,255,0.06), transparent 55%), radial-gradient(ellipse at bottom, rgba(0,0,0,0.45), transparent 60%)',
-        }}
-      />
-      {/* Faint grid texture */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-          backgroundSize: '72px 72px',
+          background: isLight
+            ? `radial-gradient(ellipse 80% 50% at 50% -5%, ${board.glow.light}, transparent 70%)`
+            : `radial-gradient(ellipse 80% 50% at 50% -5%, ${board.glow.dark}, transparent 70%), radial-gradient(ellipse 60% 40% at 50% 110%, rgba(0,0,0,0.4), transparent 70%)`,
         }}
       />
 
@@ -196,7 +224,10 @@ export function LeaderboardTv() {
       <button
         type="button"
         onClick={() => navigate('/')}
-        className="fixed right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-full bg-white/[0.04] text-white/50 ring-1 ring-white/10 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
+        className={cn(
+          'fixed right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-full ring-1 backdrop-blur transition sm:right-6 sm:top-6 sm:h-11 sm:w-11',
+          t.closeBg, t.closeHover,
+        )}
         aria-label="Close"
         title="Esc"
       >
@@ -204,55 +235,53 @@ export function LeaderboardTv() {
       </button>
 
       <div className="relative z-10 flex h-full flex-col p-4 sm:p-6 xl:p-12">
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:pb-6 md:flex-row md:items-center md:justify-between">
+        {/* ── Header ───────────────────────────────────────────────── */}
+        <header className={cn('flex flex-col gap-4 border-b pb-4 sm:pb-6 md:flex-row md:items-center md:justify-between', t.border)}>
           <div className="flex items-center gap-3 sm:gap-5">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.06] ring-1 ring-white/10 sm:h-14 sm:w-14">
-              <Trophy className="h-5 w-5 text-white/70 sm:h-7 sm:w-7" />
+            <div className={cn('grid h-10 w-10 place-items-center rounded-xl ring-1 sm:h-14 sm:w-14', t.iconBg, t.iconRing)}>
+              <Trophy className={cn('h-5 w-5 sm:h-7 sm:w-7', t.textMuted)} />
             </div>
             <div className="min-w-0">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/40 sm:text-[11px] sm:tracking-[0.32em]">
+              <p className={cn('font-mono text-[10px] uppercase tracking-[0.24em] sm:text-[11px] sm:tracking-[0.32em]', t.textSubtle)}>
                 Ryderwear Warehouse
               </p>
-              <h1 className="mt-0.5 text-[clamp(1.1rem,4.5vw,2.6rem)] font-bold leading-tight text-white">
+              <h1 className="mt-0.5 text-[clamp(1.1rem,4.5vw,2.6rem)] font-bold leading-tight">
                 Operations Leaderboard
               </h1>
             </div>
           </div>
           <div className="flex items-end justify-between gap-3 md:flex-col md:items-end md:text-right">
-            <div className="font-mono text-[clamp(2rem,9vw,4.5rem)] font-bold leading-none text-white tabular-nums tracking-tight">
+            <div className="font-mono text-[clamp(2rem,9vw,4.5rem)] font-bold leading-none tabular-nums tracking-tight">
               {timeStr}
             </div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-white/50 sm:text-xs">
+            <p className={cn('text-[10px] uppercase tracking-[0.2em] sm:text-xs', t.textMuted)}>
               {dateStr}
             </p>
           </div>
         </header>
 
-        {/* ── Toolbar row: mode + windows ───────────────────────── */}
+        {/* ── Toolbar: category + window switcher ─────────────────── */}
         <div className="mt-4 flex flex-col gap-3 sm:mt-6 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
-          {/* Big category title */}
           <div className="flex items-baseline gap-2 sm:gap-4">
             <board.Icon
-              className={cn('h-6 w-6 sm:h-10 sm:w-10', board.accent.text)}
+              className={cn('h-6 w-6 sm:h-10 sm:w-10', isLight ? board.accent.light : board.accent.dark)}
             />
             <h2
               key={mode}
               className={cn(
                 'text-[clamp(1.8rem,8vw,5.5rem)] font-black uppercase leading-none tracking-tight',
-                board.accent.text,
+                isLight ? board.accent.light : board.accent.dark,
                 'animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)]',
               )}
             >
               {board.label}
             </h2>
-            <span className="hidden self-end pb-1 text-[10px] uppercase tracking-[0.25em] text-white/40 sm:inline sm:pb-2 sm:text-base">
+            <span className={cn('hidden self-end pb-1 text-[10px] uppercase tracking-[0.25em] sm:inline sm:pb-2 sm:text-base', t.textSubtle)}>
               by {board.metricLabel}
             </span>
           </div>
 
-          {/* Window switcher */}
-          <div className="inline-flex w-full rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/10 md:w-auto">
+          <div className={cn('inline-flex w-full rounded-xl p-1 ring-1 md:w-auto', t.chipBg, t.cardRing)}>
             {WINDOWS.map((w) => (
               <button
                 key={w.key}
@@ -260,9 +289,7 @@ export function LeaderboardTv() {
                 onClick={() => setWin(w.key)}
                 className={cn(
                   'flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition sm:px-5 sm:text-sm md:flex-initial',
-                  win === w.key
-                    ? 'bg-white text-black shadow-lg'
-                    : 'text-white/60 hover:text-white',
+                  win === w.key ? t.pillActive + ' shadow-lg' : t.pillIdle,
                 )}
               >
                 {w.label}
@@ -271,44 +298,43 @@ export function LeaderboardTv() {
           </div>
         </div>
 
-        {/* Window sub-label */}
-        <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40 sm:text-sm">
+        <p className={cn('mt-2 text-[10px] uppercase tracking-[0.2em] sm:text-sm', t.textSubtle)}>
           {windowMeta.sub}
         </p>
 
-        {/* ── Main board ────────────────────────────────────────── */}
+        {/* ── Main ─────────────────────────────────────────────────── */}
         <main className="mt-6 flex flex-1 flex-col gap-6">
           {err ? (
             <Centered>
-              <p className="text-2xl text-white/70">{err}</p>
+              <p className={cn('text-2xl', t.textMuted)}>{err}</p>
             </Centered>
           ) : rowsForWindow === null ? (
             <Centered>
-              <p className="text-2xl text-white/40">Loading…</p>
+              <p className={cn('text-2xl', t.textSubtle)}>Loading…</p>
             </Centered>
           ) : !winConfigured ? (
             <Centered>
-              <board.Icon className="mb-4 h-14 w-14 text-white/20" />
-              <p className="text-2xl font-semibold text-white/80">
+              <board.Icon className={cn('mb-4 h-14 w-14', t.textSubtle)} />
+              <p className={cn('text-2xl font-semibold', t.textMuted)}>
                 {windowMeta.label} template isn't configured
               </p>
-              <p className="mt-2 max-w-xl text-sm uppercase tracking-wider text-white/40">
+              <p className={cn('mt-2 max-w-xl text-sm uppercase tracking-wider', t.textSubtle)}>
                 Set PVX_PICK_TEMPLATE_{win === 'today' ? 'TODAY' : win === 'week' ? 'WTD' : 'MTD'} on the server.
               </p>
             </Centered>
           ) : ranked.length === 0 ? (
             <Centered>
-              <board.Icon className="mb-4 h-14 w-14 text-white/20" />
-              <p className="text-2xl font-semibold text-white/80">
+              <board.Icon className={cn('mb-4 h-14 w-14', t.textSubtle)} />
+              <p className={cn('text-2xl font-semibold', t.textMuted)}>
                 No {board.label.toLowerCase()} activity {win === 'today' ? 'yet today' : win === 'week' ? 'this week' : 'this month'}
               </p>
-              <p className="mt-2 text-sm uppercase tracking-wider text-white/40">
+              <p className={cn('mt-2 text-sm uppercase tracking-wider', t.textSubtle)}>
                 Refreshing every {REFRESH_MS / 1000}s
               </p>
             </Centered>
           ) : (
             <>
-              <Podium top={topThree} board={board} key={`${mode}-${win}-podium`} />
+              <Podium top={topThree} board={board} isLight={isLight} key={`${mode}-${win}-podium`} />
               {rest.length > 0 && (
                 <ol className="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-3">
                   {rest.map((r, i) => (
@@ -317,6 +343,7 @@ export function LeaderboardTv() {
                       row={r}
                       rank={i + 4}
                       board={board}
+                      isLight={isLight}
                     />
                   ))}
                 </ol>
@@ -325,20 +352,18 @@ export function LeaderboardTv() {
           )}
         </main>
 
-        {/* ── Footer ───────────────────────────────────────────── */}
-        <footer className="mt-4 flex flex-col items-start gap-3 border-t border-white/10 pt-4 text-[10px] uppercase tracking-[0.2em] text-white/50 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]">
+        {/* ── Footer ───────────────────────────────────────────────── */}
+        <footer className={cn('mt-4 flex flex-col items-start gap-3 border-t pt-4 text-[10px] uppercase tracking-[0.2em] sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]', t.border, t.textMuted)}>
           <div className="flex items-center gap-3">
             <span className="relative inline-flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            <span>
-              Live · refreshed {data.latest ? agoLabel(data.latest) : '—'}
-            </span>
+            <span>Live · refreshed {data.latest ? agoLabel(data.latest) : '—'}</span>
           </div>
           <div className="flex items-center gap-3">
-            <Dot active={mode === 'pick'} accent={BOARDS.pick.accent.bar} />
-            <Dot active={mode === 'pack'} accent={BOARDS.pack.accent.bar} />
+            <Dot active={mode === 'pick'} accent={BOARDS.pick.bar} />
+            <Dot active={mode === 'pack'} accent={BOARDS.pack.bar} />
             <span className="ml-2 hidden sm:inline">Cycles every {CYCLE_MS / 1000}s</span>
             <span className="ml-2 sm:hidden">{CYCLE_MS / 1000}s cycle</span>
           </div>
@@ -358,6 +383,43 @@ export function LeaderboardTv() {
           from { opacity: 0; transform: translateX(-8px); }
           to   { opacity: 1; transform: translateX(0); }
         }
+        @keyframes metalShimmer {
+          0%   { background-position: -150% 0; }
+          100% { background-position: 250% 0; }
+        }
+        @keyframes goldGlow {
+          0%, 100% { box-shadow: 0 0 24px -4px rgba(251, 191, 36, 0.45), 0 0 80px -20px rgba(251, 191, 36, 0.35); }
+          50%      { box-shadow: 0 0 40px -2px rgba(251, 191, 36, 0.65), 0 0 120px -10px rgba(251, 191, 36, 0.5); }
+        }
+        @keyframes sparkleTwinkle {
+          0%, 100% { opacity: 0;   transform: scale(0.6) rotate(0deg); }
+          50%      { opacity: 0.9; transform: scale(1.1) rotate(45deg); }
+        }
+        .metal-shimmer {
+          background-size: 250% 100%;
+          animation: metalShimmer var(--shimmer-duration, 4.5s) linear infinite;
+        }
+        .metal-text {
+          background-clip: text;
+          -webkit-background-clip: text;
+          color: transparent;
+          background-size: 250% 100%;
+        }
+        .metal-text-shimmer {
+          animation: metalShimmer 5s linear infinite;
+        }
+        .gold-glow {
+          animation: goldGlow 3.2s ease-in-out infinite;
+        }
+        .sparkle {
+          position: absolute;
+          width: 14px; height: 14px;
+          background:
+            linear-gradient(transparent 6px, white 6px, white 8px, transparent 8px),
+            linear-gradient(90deg, transparent 6px, white 6px, white 8px, transparent 8px);
+          pointer-events: none;
+          animation: sparkleTwinkle 2.2s ease-in-out infinite;
+        }
       `}</style>
     </div>
   )
@@ -371,68 +433,193 @@ function Centered({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Podium({ top, board }: { top: LeaderboardRow[]; board: BoardConfig }) {
-  // On md+, classic 3-column podium with #1 in the centre.
-  // On mobile, stack: #1 hero card at top, #2 + #3 side-by-side beneath.
+function Podium({
+  top, board, isLight,
+}: {
+  top: LeaderboardRow[]
+  board: BoardConfig
+  isLight: boolean
+}) {
   return (
     <>
-      {/* Mobile / small screens — stacked layout */}
+      {/* Mobile / small screens — stacked */}
       <div className="flex flex-col gap-3 md:hidden">
-        <MobilePodiumHero row={top[0]} board={board} />
+        <MobilePodiumHero row={top[0]} board={board} isLight={isLight} />
         {(top[1] || top[2]) && (
           <div className="grid grid-cols-2 gap-3">
-            <MobilePodiumCard row={top[1]} rank={2} board={board} delayMs={140} />
-            <MobilePodiumCard row={top[2]} rank={3} board={board} delayMs={220} />
+            <MobilePodiumCard row={top[1]} rank={2} board={board} isLight={isLight} delayMs={140} />
+            <MobilePodiumCard row={top[2]} rank={3} board={board} isLight={isLight} delayMs={220} />
           </div>
         )}
       </div>
 
-      {/* Desktop / TV — classic podium pillars */}
+      {/* Desktop / TV — classic 3-pillar podium */}
       <div className="hidden grid-cols-3 items-end gap-6 md:grid xl:gap-10">
-        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} delayMs={140} />
-        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} delayMs={0} />
-        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} delayMs={280} />
+        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} isLight={isLight} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} isLight={isLight} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} isLight={isLight} delayMs={280} />
       </div>
     </>
   )
 }
 
+function PodiumColumn({
+  row, rank, height, board, isLight, delayMs,
+}: {
+  row: LeaderboardRow | undefined
+  rank: number
+  height: string
+  board: BoardConfig
+  isLight: boolean
+  delayMs: number
+}) {
+  const isWinner = rank === 1
+  const metalGradient = METAL_BY_RANK[rank]
+
+  return (
+    <div
+      className="flex flex-col items-center"
+      style={{ animation: `podiumRise 600ms ${delayMs}ms cubic-bezier(0.16,1,0.3,1) both` }}
+    >
+      {/* Labels above the pillar */}
+      <div className="mb-4 flex flex-col items-center text-center">
+        {row ? (
+          <>
+            <MedalChip rank={rank} />
+            <p
+              className={cn(
+                'font-bold uppercase leading-tight',
+                isLight ? 'text-slate-900' : 'text-white',
+                isWinner ? 'text-[clamp(1.8rem,3vw,3rem)]' : 'text-[clamp(1.2rem,2vw,2rem)]',
+              )}
+            >
+              {row.picker}
+            </p>
+            <div className="mt-2 flex items-baseline gap-2">
+              {/* Big score — metallic gradient text, shimmer on gold */}
+              <span
+                className={cn(
+                  'tabular-nums font-black leading-none tracking-tight metal-text',
+                  isWinner ? 'metal-text-shimmer text-[clamp(3rem,5.5vw,6rem)]' : 'text-[clamp(2rem,3.6vw,3.6rem)]',
+                )}
+                style={{ backgroundImage: metalGradient }}
+              >
+                {fmtN(row[board.metricKey] as number)}
+              </span>
+            </div>
+            <div
+              className={cn(
+                'mt-1 text-xs uppercase tracking-[0.2em]',
+                isLight ? 'text-slate-500' : 'text-white/40',
+              )}
+            >
+              {board.metricLabel}
+            </div>
+          </>
+        ) : (
+          <>
+            <span className={cn('mb-3 inline-flex h-11 items-center rounded-full px-4 text-sm font-bold uppercase tracking-wider',
+              isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/30')}>
+              #{rank}
+            </span>
+            <p className={cn('text-[clamp(1.2rem,2vw,2rem)] font-bold', isLight ? 'text-slate-300' : 'text-white/30')}>—</p>
+            <p className={cn('mt-2 text-[clamp(2rem,3vw,3rem)] font-black', isLight ? 'text-slate-200' : 'text-white/20')}>—</p>
+          </>
+        )}
+      </div>
+
+      {/* The metallic pillar */}
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-t-lg ring-1',
+          height,
+          isLight ? 'ring-slate-200' : 'ring-white/10',
+          row ? 'metal-shimmer' : '',
+          isWinner && row ? 'gold-glow' : '',
+        )}
+        style={
+          row
+            ? {
+                backgroundImage: metalGradient,
+                ['--shimmer-duration' as string]: isWinner ? '3.5s' : rank === 2 ? '5s' : '6.5s',
+              }
+            : { background: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)' }
+        }
+      >
+        {/* Top edge highlight */}
+        <div className={cn('absolute inset-x-0 top-0 h-[3px]', row ? 'bg-white/60' : 'bg-white/15')} />
+
+        {/* Big rank numeral cut into the pillar */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className={cn(
+              'select-none font-black leading-none tracking-tighter',
+              isWinner ? 'text-[14vh]' : rank === 2 ? 'text-[11vh]' : 'text-[9vh]',
+            )}
+            style={{
+              color: 'rgba(0,0,0,0.18)',
+              textShadow: '0 2px 0 rgba(255,255,255,0.18)',
+            }}
+          >
+            {rank}
+          </span>
+        </div>
+
+        {/* Sparkles on the gold pillar */}
+        {isWinner && row && (
+          <>
+            <Sparkle style={{ top: '18%', left: '24%', animationDelay: '0s' }} />
+            <Sparkle style={{ top: '42%', left: '72%', animationDelay: '0.7s' }} />
+            <Sparkle style={{ top: '68%', left: '40%', animationDelay: '1.4s' }} />
+            <Sparkle style={{ top: '30%', left: '60%', animationDelay: '0.3s', transform: 'scale(0.7)' }} />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function MobilePodiumHero({
-  row, board,
-}: { row: LeaderboardRow | undefined; board: BoardConfig }) {
+  row, board, isLight,
+}: { row: LeaderboardRow | undefined; board: BoardConfig; isLight: boolean }) {
   if (!row) {
     return (
-      <div className="rounded-2xl bg-white/[0.04] p-5 text-center ring-1 ring-white/10">
-        <p className="text-base font-bold text-white/40">No #1 yet</p>
+      <div className={cn('rounded-2xl p-5 text-center ring-1',
+        isLight ? 'bg-slate-100 ring-slate-200' : 'bg-white/[0.04] ring-white/10')}>
+        <p className={cn('text-base font-bold', isLight ? 'text-slate-400' : 'text-white/40')}>No #1 yet</p>
       </div>
     )
   }
   return (
     <div
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/15 via-white/10 to-white/5 p-5 ring-1 ring-white/10"
-      style={{ animation: 'podiumRise 600ms cubic-bezier(0.16,1,0.3,1) both' }}
+      className={cn(
+        'relative overflow-hidden rounded-2xl p-5 ring-1 metal-shimmer gold-glow',
+        isLight ? 'ring-amber-300/40' : 'ring-amber-300/30',
+      )}
+      style={{
+        backgroundImage: METAL.gold,
+        ['--shimmer-duration' as string]: '3.5s',
+        animation: 'podiumRise 600ms cubic-bezier(0.16,1,0.3,1) both',
+      }}
     >
-      <div className={cn('absolute inset-x-0 top-0 h-[3px]', board.accent.bar)} />
-      <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-400 px-3 text-xs font-black uppercase tracking-wider text-black shadow-lg">
+      <Sparkle style={{ top: '20%', left: '78%' }} />
+      <Sparkle style={{ top: '70%', left: '18%', animationDelay: '1s' }} />
+
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black/80 px-3 text-xs font-black uppercase tracking-wider text-amber-300 shadow-lg ring-1 ring-amber-300/60">
           <Crown className="h-3.5 w-3.5" />
           #1
         </span>
         <div className="text-right">
-          <div
-            className={cn(
-              'tabular-nums text-[clamp(2.4rem,11vw,4rem)] font-black leading-none tracking-tight',
-              board.accent.text,
-            )}
-          >
+          <div className="tabular-nums text-[clamp(2.4rem,11vw,4rem)] font-black leading-none tracking-tight text-black/90 drop-shadow-[0_2px_0_rgba(255,255,255,0.4)]">
             {fmtN(row[board.metricKey] as number)}
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/40">
+          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black/60">
             {board.metricLabel}
           </div>
         </div>
       </div>
-      <p className="mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-bold uppercase leading-tight text-white">
+      <p className="relative z-10 mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">
         {row.picker}
       </p>
     </div>
@@ -440,175 +627,132 @@ function MobilePodiumHero({
 }
 
 function MobilePodiumCard({
-  row, rank, board, delayMs,
+  row, rank, board, isLight, delayMs,
 }: {
   row: LeaderboardRow | undefined
   rank: number
   board: BoardConfig
+  isLight: boolean
   delayMs: number
 }) {
-  const medal: Record<number, string> = {
-    2: 'bg-slate-300 text-black',
-    3: 'bg-amber-700 text-white',
-  }
+  const metalGradient = METAL_BY_RANK[rank]
+  const textColor = rank === 3 ? 'text-amber-50' : 'text-slate-900'
+  const subText = rank === 3 ? 'text-amber-200/80' : 'text-slate-700/80'
+
   return (
     <div
-      className="rounded-2xl bg-white/[0.04] p-3.5 ring-1 ring-white/10"
+      className={cn(
+        'relative overflow-hidden rounded-2xl p-3.5 ring-1 metal-shimmer',
+        isLight ? 'ring-slate-300/60' : 'ring-white/10',
+      )}
       style={{
+        backgroundImage: row ? metalGradient : (isLight ? '#e2e8f0' : 'rgba(255,255,255,0.05)'),
+        ['--shimmer-duration' as string]: rank === 2 ? '5s' : '6.5s',
         animation: `podiumRise 600ms ${delayMs}ms cubic-bezier(0.16,1,0.3,1) both`,
       }}
     >
-      <div className="flex items-center justify-between">
-        <span
-          className={cn(
-            'inline-flex h-7 items-center rounded-full px-2.5 text-[11px] font-black uppercase tracking-wider',
-            row ? medal[rank] : 'bg-white/10 text-white/30',
-          )}
-        >
+      <div className="relative z-10 flex items-center justify-between">
+        <span className={cn(
+          'inline-flex h-7 items-center rounded-full px-2.5 text-[11px] font-black uppercase tracking-wider',
+          row ? 'bg-black/70 text-white ring-1 ring-white/20' : 'bg-white/10 text-white/30',
+        )}>
           #{rank}
         </span>
-        <span
-          className={cn(
-            'tabular-nums text-2xl font-black leading-none tracking-tight',
-            row ? board.accent.text : 'text-white/30',
-          )}
-        >
+        <span className={cn(
+          'tabular-nums text-2xl font-black leading-none tracking-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.3)]',
+          row ? textColor : 'text-white/30',
+        )}>
           {row ? fmtN(row[board.metricKey] as number) : '—'}
         </span>
       </div>
-      <p
-        className={cn(
-          'mt-2 truncate text-base font-bold uppercase leading-tight',
-          row ? 'text-white' : 'text-white/40',
-        )}
-      >
+      <p className={cn(
+        'relative z-10 mt-2 truncate text-base font-black uppercase leading-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.25)]',
+        row ? textColor : 'text-white/40',
+      )}>
         {row?.picker ?? '—'}
       </p>
+      {row && (
+        <div className={cn('relative z-10 mt-0.5 text-[10px] font-bold uppercase tracking-wider', subText)}>
+          {board.metricLabel}
+        </div>
+      )}
     </div>
   )
 }
 
-function PodiumColumn({
-  row, rank, height, board, delayMs,
-}: {
-  row: LeaderboardRow | undefined
-  rank: number
-  height: string
-  board: BoardConfig
-  delayMs: number
-}) {
-  const isWinner = rank === 1
-  // Three matte medal tones — gold / silver / bronze, plus a flat tone
-  // for empty placeholders. Solid colors, no flashy gradients.
-  const medal: Record<number, string> = {
-    1: 'bg-amber-400 text-black',
-    2: 'bg-slate-300 text-black',
-    3: 'bg-amber-700 text-white',
+function MedalChip({ rank }: { rank: number }) {
+  if (rank === 1) {
+    return (
+      <span
+        className="mb-3 inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-black uppercase tracking-wider text-black shadow-lg metal-shimmer"
+        style={{ backgroundImage: METAL.gold, ['--shimmer-duration' as string]: '3.5s' }}
+      >
+        <Crown className="h-4 w-4" />
+        #1
+      </span>
+    )
+  }
+  if (rank === 2) {
+    return (
+      <span
+        className="mb-3 inline-flex h-11 items-center rounded-full px-4 text-sm font-black uppercase tracking-wider text-black shadow-lg metal-shimmer"
+        style={{ backgroundImage: METAL.silver, ['--shimmer-duration' as string]: '5s' }}
+      >
+        #2
+      </span>
+    )
   }
   return (
-    <div
-      className="flex flex-col items-center"
-      style={{ animation: `podiumRise 600ms ${delayMs}ms cubic-bezier(0.16,1,0.3,1) both` }}
+    <span
+      className="mb-3 inline-flex h-11 items-center rounded-full px-4 text-sm font-black uppercase tracking-wider text-amber-50 shadow-lg metal-shimmer"
+      style={{ backgroundImage: METAL.bronze, ['--shimmer-duration' as string]: '6.5s' }}
     >
-      <div className="mb-4 flex flex-col items-center text-center">
-        {row ? (
-          <>
-            <span
-              className={cn(
-                'mb-3 inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-black uppercase tracking-wider shadow-lg',
-                medal[rank],
-              )}
-            >
-              {isWinner ? <Crown className="h-4 w-4" /> : null}
-              #{rank}
-            </span>
-            <p
-              className={cn(
-                'font-bold uppercase leading-tight text-white',
-                isWinner
-                  ? 'text-[clamp(1.8rem,3vw,3rem)]'
-                  : 'text-[clamp(1.2rem,2vw,2rem)] text-white/90',
-              )}
-            >
-              {row.picker}
-            </p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span
-                className={cn(
-                  'tabular-nums font-black leading-none tracking-tight',
-                  isWinner
-                    ? cn('text-[clamp(3rem,5.5vw,6rem)]', board.accent.text)
-                    : 'text-[clamp(2rem,3.6vw,3.6rem)] text-white',
-                )}
-              >
-                {fmtN(row[board.metricKey] as number)}
-              </span>
-            </div>
-            <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">
-              {board.metricLabel}
-            </div>
-          </>
-        ) : (
-          <>
-            <span className="mb-3 inline-flex h-11 items-center rounded-full bg-white/5 px-4 text-sm font-bold uppercase tracking-wider text-white/30">
-              #{rank}
-            </span>
-            <p className="text-[clamp(1.2rem,2vw,2rem)] font-bold text-white/30">—</p>
-            <p className="mt-2 text-[clamp(2rem,3vw,3rem)] font-black text-white/20">—</p>
-          </>
-        )}
-      </div>
-
-      {/* Column */}
-      <div
-        className={cn(
-          'relative w-full overflow-hidden rounded-t-lg ring-1 ring-white/10',
-          height,
-          isWinner ? 'bg-gradient-to-b from-white/15 via-white/10 to-white/5' : 'bg-white/[0.05]',
-        )}
-      >
-        {isWinner ? (
-          <div className={cn('absolute inset-x-0 top-0 h-[3px]', board.accent.bar)} />
-        ) : (
-          <div className="absolute inset-x-0 top-0 h-[2px] bg-white/30" />
-        )}
-        <div className="absolute inset-x-4 bottom-4 grid h-12 place-items-center rounded-md bg-black/40 text-2xl font-black text-white/60 ring-1 ring-white/5">
-          {rank}
-        </div>
-      </div>
-    </div>
+      #3
+    </span>
   )
+}
+
+function Sparkle({ style }: { style?: React.CSSProperties }) {
+  return <span className="sparkle" style={style} aria-hidden />
 }
 
 function RestRow({
-  row, rank, board,
+  row, rank, board, isLight,
 }: {
   row: LeaderboardRow
   rank: number
   board: BoardConfig
+  isLight: boolean
 }) {
   return (
     <li
-      className="flex items-center gap-3 rounded-lg bg-white/[0.04] px-3 py-2.5 ring-1 ring-white/10 sm:gap-5 sm:px-5 sm:py-3"
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 ring-1 sm:gap-5 sm:px-5 sm:py-3 transition-colors',
+        isLight ? 'bg-white/80 ring-slate-200' : 'bg-white/[0.04] ring-white/10',
+      )}
       style={{
         animation: `restSlide 450ms ${(rank - 4) * 60}ms cubic-bezier(0.16,1,0.3,1) both`,
       }}
     >
-      <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md bg-white/5 font-mono text-sm font-bold text-white/60 sm:h-10 sm:w-10 sm:text-base">
+      <span
+        className={cn(
+          'grid h-8 w-8 flex-shrink-0 place-items-center rounded-md font-mono text-sm font-bold sm:h-10 sm:w-10 sm:text-base',
+          isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/5 text-white/60',
+        )}
+      >
         {rank}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-base font-bold text-white sm:text-xl xl:text-2xl">
+        <div className={cn('truncate text-base font-bold sm:text-xl xl:text-2xl',
+          isLight ? 'text-slate-900' : 'text-white')}>
           {row.picker}
         </div>
       </div>
       <div className="text-right">
-        <span
-          className={cn(
-            'tabular-nums text-xl font-black tracking-tight sm:text-3xl xl:text-4xl',
-            board.accent.text,
-          )}
-        >
+        <span className={cn(
+          'tabular-nums text-xl font-black tracking-tight sm:text-3xl xl:text-4xl',
+          isLight ? board.accent.light : board.accent.dark,
+        )}>
           {fmtN(row[board.metricKey] as number)}
         </span>
       </div>
@@ -621,7 +765,7 @@ function Dot({ active, accent }: { active: boolean; accent: string }) {
     <span
       className={cn(
         'h-1.5 rounded-full transition-all duration-500',
-        active ? cn('w-8', accent) : 'w-2 bg-white/20',
+        active ? cn('w-8', accent) : 'w-2 bg-current opacity-20',
       )}
     />
   )
