@@ -15,6 +15,7 @@ import { Pick } from '@/routes/Pick'
 import { Settings } from '@/routes/Settings'
 import { LayoutEditor } from '@/routes/LayoutEditor'
 import { About } from '@/routes/About'
+import { LeaderboardTv } from '@/routes/LeaderboardTv'
 import { NotFound } from '@/routes/NotFound'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ShortcutsHelp } from '@/features/shortcuts/ShortcutsHelp'
@@ -174,6 +175,8 @@ export default function App() {
             </AppShell>
           }
         />
+        {/* Full-screen, no AppShell — designed for warehouse TV display */}
+        <Route path="/leaderboard" element={<LeaderboardTv />} />
         <Route
           path="*"
           element={

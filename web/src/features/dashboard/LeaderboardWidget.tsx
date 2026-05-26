@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trophy } from 'lucide-react'
+import { Trophy, Tv } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import {
@@ -16,11 +17,14 @@ const TABS: { key: LeaderboardWindow; label: string }[] = [
 ]
 
 export function LeaderboardWidget() {
+  const navigate = useNavigate()
   const [win, setWin] = useState<LeaderboardWindow>('today')
   const [data, setData] = useState<LeaderboardResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [unsupported, setUnsupported] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  const openTv = () => navigate('/leaderboard')
 
   useEffect(() => {
     if (unsupported) return
@@ -53,33 +57,60 @@ export function LeaderboardWidget() {
   if (unsupported) return null
 
   return (
-    <Card>
+    <Card
+      className="group cursor-pointer transition hover:ring-1 hover:ring-brand-ring/40"
+      onClick={openTv}
+      role="link"
+      aria-label="Open warehouse TV leaderboard"
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          openTv()
+        }
+      }}
+    >
       <CardHeader
         eyebrow="Picking"
         title="Picker leaderboard"
         action={
-          <div
-            className="inline-flex rounded-lg border border-line bg-surface/40 p-0.5"
-            role="tablist"
-            aria-label="Leaderboard window"
-          >
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                role="tab"
-                aria-selected={win === t.key}
-                onClick={() => setWin(t.key)}
-                className={cn(
-                  'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
-                  win === t.key
-                    ? 'bg-brand-grad text-white shadow-glow'
-                    : 'text-muted hover:text-ink',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="inline-flex rounded-lg border border-line bg-surface/40 p-0.5"
+              role="tablist"
+              aria-label="Leaderboard window"
+            >
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={win === t.key}
+                  onClick={() => setWin(t.key)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
+                    win === t.key
+                      ? 'bg-brand-grad text-white shadow-glow'
+                      : 'text-muted hover:text-ink',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                openTv()
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface/40 px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-brand-ring/40 hover:text-ink"
+              aria-label="Open TV view"
+              title="Full-screen TV view"
+            >
+              <Tv className="h-3.5 w-3.5" />
+              TV view
+            </button>
           </div>
         }
       />
