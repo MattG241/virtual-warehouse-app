@@ -221,97 +221,35 @@ app.post('/api/picks/sync-now', express.json(), async (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
   const allowed = new Set(['today', 'week', 'month']);
   const windowKey = allowed.has(String(req.query.window)) ? req.query.window : 'today';
-  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
-  const mode = String(req.query.mode || 'diff');
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
 
-  // Raw mode: return rows from the *single most recent* sync run, verbatim.
-  // All rows inserted in one runPickSync() call share the exact same
-  // snapshot_at, so we can grab them with `= MAX(snapshot_at)`. This avoids
-  // mixing snapshots from different templates / time filters.
-  if (mode === 'raw') {
-    try {
-      const r = await pool.query(
-        `WITH latest_ts AS (
-           SELECT MAX(snapshot_at) AS ts FROM pick_user_totals
-         )
-         SELECT picker,
-                items_picked       AS units,
-                picks_completed    AS lines,
-                orders_despatched  AS orders,
-                items_skipped, containers_moved, item_movements,
-                items_moved, packages_despatched, items_despatched,
-                snapshot_at
-           FROM pick_user_totals, latest_ts
-          WHERE snapshot_at = latest_ts.ts
-          ORDER BY units DESC, lines DESC
-          LIMIT $1`,
-        [limit],
-      );
-      res.set('Cache-Control', 'no-store');
-      res.json({
-        mode: 'raw',
-        configured: Boolean(config.pvx.pickTemplate),
-        rows: r.rows,
-        totalRows: r.rows.length,
-        latest: r.rows.length ? r.rows[0].snapshot_at : null,
-      });
-      return;
-    } catch (e) {
-      console.error('[api/leaderboard raw] error:', e);
-      res.status(500).json({ error: e.message });
-      return;
-    }
-  }
-
-  // PVX gives us cumulative totals — to get "activity within a window" we
-  // diff the latest snapshot against the newest snapshot taken before the
-  // window started. Users without a pre-window baseline are excluded from
-  // that window's leaderboard until they accumulate history.
-  const windowStartExpr = {
-    today: "date_trunc('day', NOW())",
-    week: "NOW() - INTERVAL '7 days'",
-    month: "NOW() - INTERVAL '30 days'",
-  }[windowKey];
-
-  const sql = `
-    WITH latest AS (
-      SELECT DISTINCT ON (picker)
-        picker, items_picked, picks_completed, orders_despatched, snapshot_at
-      FROM pick_user_totals
-      ORDER BY picker, snapshot_at DESC
-    ),
-    baseline AS (
-      SELECT DISTINCT ON (picker)
-        picker, items_picked, picks_completed, orders_despatched
-      FROM pick_user_totals
-      WHERE snapshot_at < ${windowStartExpr}
-      ORDER BY picker, snapshot_at DESC
-    )
-    SELECT
-      l.picker,
-      GREATEST(l.items_picked      - COALESCE(b.items_picked, l.items_picked), 0)::int           AS units,
-      GREATEST(l.picks_completed   - COALESCE(b.picks_completed, l.picks_completed), 0)::int    AS lines,
-      GREATEST(l.orders_despatched - COALESCE(b.orders_despatched, l.orders_despatched), 0)::int AS orders
-    FROM latest l
-    LEFT JOIN baseline b ON b.picker = l.picker
-    WHERE b.picker IS NOT NULL
-      AND (l.items_picked - b.items_picked) > 0
-    ORDER BY units DESC, lines DESC
-    LIMIT $1`;
+  const template = config.pvx.pickTemplates?.[windowKey] || '';
+  const configured = Boolean(template);
 
   try {
-    const r = await pool.query(sql, [limit]);
-    const totals = await pool.query(
-      `SELECT COUNT(DISTINCT picker)::int AS total_rows, MAX(snapshot_at) AS latest
-         FROM pick_user_totals`,
+    const r = await pool.query(
+      `SELECT picker,
+              picks_completed, items_picked, items_skipped,
+              containers_moved, item_movements, items_moved,
+              orders_despatched, packages_despatched, items_despatched,
+              updated_at
+         FROM pick_user_totals
+        WHERE window_key = $1
+        ORDER BY items_picked DESC, items_despatched DESC
+        LIMIT $2`,
+      [windowKey, limit],
     );
+    const latest = r.rows.length
+      ? r.rows.reduce((max, row) => (row.updated_at > max ? row.updated_at : max), r.rows[0].updated_at)
+      : null;
     res.set('Cache-Control', 'no-store');
     res.json({
       window: windowKey,
-      configured: Boolean(config.pvx.pickTemplate),
+      configured,
+      template: template || null,
       rows: r.rows,
-      totalRows: totals.rows[0]?.total_rows || 0,
-      latest: totals.rows[0]?.latest || null,
+      totalRows: r.rows.length,
+      latest,
     });
   } catch (e) {
     console.error('[api/leaderboard] error:', e);

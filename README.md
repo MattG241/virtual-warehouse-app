@@ -72,30 +72,27 @@ Add these to Railway → service → **Variables**:
 
 That's it — no external email service required. Passwords are hashed with scrypt (Node built-in) and stored in the `users` table. Anyone whose email is in `ALLOWED_EMAILS` can hit **Sign in → Create one** on first visit, pick a password, and they're in. Subsequent visits use email + password.
 
-### Picking leaderboard
+### Picking & packing leaderboard
 
-The dashboard ranks pickers by units picked over Today / Last 7d / Last 30d windows. It runs by default against PVX's built-in **`User activity`** report, which returns cumulative per-user totals (Picks completed, Items picked, Items moved, Orders despatched, etc.).
+The dashboard ranks staff by **items picked** (Picking mode) or **items despatched** (Packing mode) across three time windows: **Today**, **Week to date**, and **Month to date**. There's also a full-screen TV view at `/leaderboard` that auto-cycles between Pick and Pack every 12 seconds — designed for a warehouse big-screen display.
 
-| Variable             | Default                                                                                                                                                                                                                | Notes                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `PVX_PICK_TEMPLATE`  | `User activity`                                                                                                                                                                                                        | Set to empty string to disable the leaderboard entirely.                                    |
-| `PVX_PICK_COLUMNS`   | `[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]`                                 | Override if your template renames columns.                                                  |
-| `PVX_PICK_USER_COL`  | `UserName`                                                                                                                                                                                                             | The column name holding the picker.                                                         |
+Each window is driven by its own PVX User-activity report template (with the date filter baked in at the template level). The sync runs all configured templates each cycle and writes the current per-user totals into `pick_user_totals`, keyed by window. There's no diffing or snapshot history — each window just shows the latest data PVX returned for that filter.
 
-**How the time-window leaderboard works.** The User activity report only gives totals, not per-event timestamps. The sync therefore snapshots the whole table into `pick_user_totals` (one row per user per sync, append-only). The `/api/leaderboard` endpoint then computes window activity as:
-
-```
-latest_snapshot - newest_snapshot_taken_before_window_start
-```
-
-So "Today" = current totals minus whatever the totals were at midnight. "Last 7d" diffs against 7 days ago, etc. Pickers without a pre-window snapshot are excluded for that window (they'll appear once history catches up — typically the next sync). Old snapshots are pruned after 35 days.
+| Variable                   | Default                                                                                                                                                                                | Notes                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `PVX_PICK_TEMPLATE_TODAY`  | `User activity - Today`                                                                                                                                                                | Template filtered to today. Empty string disables the Today window.                            |
+| `PVX_PICK_TEMPLATE_WTD`    | *(empty)*                                                                                                                                                                              | Template filtered to week-to-date (e.g. Monday → now). Create in PVX → Reporting → Templates.  |
+| `PVX_PICK_TEMPLATE_MTD`    | `User activity`                                                                                                                                                                        | Defaults to PVX's built-in report which filters to "Last month of user activity".              |
+| `PVX_PICK_TEMPLATE`        | *(deprecated alias)*                                                                                                                                                                   | Legacy single-template knob. If set, used as the Today template.                               |
+| `PVX_PICK_COLUMNS`         | `[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]` | Override if your templates rename columns.                                                     |
+| `PVX_PICK_USER_COL`        | `UserName`                                                                                                                                                                             | The column name holding the picker.                                                            |
 
 Rows where every metric is 0 (Admin, `Pvx*`, dormant accounts) are dropped at ingest, so the leaderboard only shows real activity.
 
 Endpoints:
 
-- `GET /api/leaderboard?window=today|week|month&limit=10` — ranked list `[{picker, units, lines, orders}]`. `units` = Items picked, `lines` = Picks completed, `orders` = Orders despatched. The `configured`, `totalRows`, and `latest` fields help the UI distinguish "not set up" from "no data yet".
-- `POST /api/picks/sync-now` — kick off a one-off pick sync (handy after changing the template/columns env vars or to seed an extra snapshot).
+- `GET /api/leaderboard?window=today|week|month&limit=20` — ranked list with all 9 metric columns. `configured` is false if no template is set for that window.
+- `POST /api/picks/sync-now` — kick off a one-off sync of every configured window. Accepts `?template=...&windowKey=...` overrides for ad-hoc testing.
 
 If your PVX tenant uses different column headers, override `PVX_PICK_COLUMNS` and (if needed) `PVX_PICK_USER_COL`. The first sync logs the available headers if a required column is missing, so you can copy the exact names.
 

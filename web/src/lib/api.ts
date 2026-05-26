@@ -124,15 +124,22 @@ export type LeaderboardWindow = 'today' | 'week' | 'month'
 
 export interface LeaderboardRow {
   picker: string
-  units: number
-  lines: number
-  orders: number
+  picks_completed: number
+  items_picked: number
+  items_skipped: number
+  containers_moved: number
+  item_movements: number
+  items_moved: number
+  orders_despatched: number
+  packages_despatched: number
+  items_despatched: number
+  updated_at: string
 }
 
 export interface LeaderboardResponse {
-  window?: LeaderboardWindow
-  mode?: 'raw' | 'diff'
+  window: LeaderboardWindow
   configured: boolean
+  template: string | null
   rows: LeaderboardRow[]
   totalRows: number
   latest: string | null
@@ -143,16 +150,10 @@ export async function fetchLeaderboard(
   win: LeaderboardWindow,
   signal?: AbortSignal,
 ): Promise<LeaderboardResponse | null> {
-  // "Today" relies on a today-filtered PVX template (default "User
-  // activity - Today"), so we read the latest snapshot directly rather
-  // than diffing against a midnight baseline that wouldn't exist on
-  // day one. Week/Month still diff against historical snapshots.
-  const qs = win === 'today' ? 'mode=raw' : `window=${encodeURIComponent(win)}`
-  const res = await fetch(`${BASE}/api/leaderboard?${qs}`, {
-    credentials: 'include',
-    cache: 'no-store',
-    signal,
-  })
+  const res = await fetch(
+    `${BASE}/api/leaderboard?window=${encodeURIComponent(win)}&limit=20`,
+    { credentials: 'include', cache: 'no-store', signal },
+  )
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`/api/leaderboard ${res.status}`)
   return res.json()

@@ -1,24 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trophy, Tv } from 'lucide-react'
+import { Package, PackageCheck, Tv, Trophy, Crown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import {
   fetchLeaderboard,
   type LeaderboardResponse,
+  type LeaderboardRow,
   type LeaderboardWindow,
 } from '@/lib/api'
 import { fmtN, timeAgo } from '@/lib/inventory'
 
-const TABS: { key: LeaderboardWindow; label: string }[] = [
+type Mode = 'pick' | 'pack'
+
+const WINDOWS: { key: LeaderboardWindow; label: string }[] = [
   { key: 'today', label: 'Today' },
-  { key: 'week', label: 'Last 7d' },
-  { key: 'month', label: 'Last 30d' },
+  { key: 'week', label: 'WTD' },
+  { key: 'month', label: 'MTD' },
 ]
+
+const MODES: { key: Mode; label: string; icon: typeof Package }[] = [
+  { key: 'pick', label: 'Picking', icon: Package },
+  { key: 'pack', label: 'Packing', icon: PackageCheck },
+]
+
+interface MetricCfg {
+  primary: keyof LeaderboardRow
+  primaryLabel: string
+  primaryUnit: string
+  secondaryA: { key: keyof LeaderboardRow; label: string }
+  secondaryB: { key: keyof LeaderboardRow; label: string }
+}
+
+const METRICS: Record<Mode, MetricCfg> = {
+  pick: {
+    primary: 'items_picked',
+    primaryLabel: 'Items picked',
+    primaryUnit: 'items',
+    secondaryA: { key: 'picks_completed', label: 'picks' },
+    secondaryB: { key: 'items_skipped', label: 'skips' },
+  },
+  pack: {
+    primary: 'items_despatched',
+    primaryLabel: 'Items despatched',
+    primaryUnit: 'items',
+    secondaryA: { key: 'packages_despatched', label: 'pkgs' },
+    secondaryB: { key: 'orders_despatched', label: 'orders' },
+  },
+}
 
 export function LeaderboardWidget() {
   const navigate = useNavigate()
   const [win, setWin] = useState<LeaderboardWindow>('today')
+  const [mode, setMode] = useState<Mode>('pick')
   const [data, setData] = useState<LeaderboardResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [unsupported, setUnsupported] = useState(false)
@@ -52,9 +86,17 @@ export function LeaderboardWidget() {
     }
   }, [win, unsupported])
 
-  // Backend missing the endpoint entirely — hide the card so it doesn't clutter
-  // the dashboard on older deploys.
   if (unsupported) return null
+
+  const metric = METRICS[mode]
+
+  // Sort + filter rows by the active metric
+  const ranked = data
+    ? [...data.rows]
+        .filter((r) => (r[metric.primary] as number) > 0)
+        .sort((a, b) => (b[metric.primary] as number) - (a[metric.primary] as number))
+        .slice(0, 6)
+    : []
 
   return (
     <Card
@@ -71,30 +113,62 @@ export function LeaderboardWidget() {
       }}
     >
       <CardHeader
-        eyebrow="Picking"
-        title="Picker leaderboard"
+        eyebrow={mode === 'pick' ? 'Picking' : 'Packing'}
+        title="Warehouse leaderboard"
         action={
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex flex-wrap items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Pick / Pack mode switch */}
             <div
               className="inline-flex rounded-lg border border-line bg-surface/40 p-0.5"
               role="tablist"
-              aria-label="Leaderboard window"
+              aria-label="Pick or pack"
             >
-              {TABS.map((t) => (
+              {MODES.map((m) => {
+                const Icon = m.icon
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === m.key}
+                    onClick={() => setMode(m.key)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
+                      mode === m.key
+                        ? 'bg-brand-grad text-white shadow-glow'
+                        : 'text-muted hover:text-ink',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {m.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Time window switch */}
+            <div
+              className="inline-flex rounded-lg border border-line bg-surface/40 p-0.5"
+              role="tablist"
+              aria-label="Time window"
+            >
+              {WINDOWS.map((w) => (
                 <button
-                  key={t.key}
+                  key={w.key}
                   type="button"
                   role="tab"
-                  aria-selected={win === t.key}
-                  onClick={() => setWin(t.key)}
+                  aria-selected={win === w.key}
+                  onClick={() => setWin(w.key)}
                   className={cn(
                     'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
-                    win === t.key
-                      ? 'bg-brand-grad text-white shadow-glow'
+                    win === w.key
+                      ? 'bg-surface-2 text-ink ring-1 ring-line-strong'
                       : 'text-muted hover:text-ink',
                   )}
                 >
-                  {t.label}
+                  {w.label}
                 </button>
               ))}
             </div>
@@ -109,74 +183,61 @@ export function LeaderboardWidget() {
               title="Full-screen TV view"
             >
               <Tv className="h-3.5 w-3.5" />
-              TV view
+              TV
             </button>
           </div>
         }
       />
       <CardBody className="!pt-1">
         {err ? (
-          <EmptyState
-            title="Couldn't load leaderboard"
-            body={err}
-            tone="bad"
-          />
+          <EmptyState title="Couldn't load leaderboard" body={err} tone="bad" />
         ) : !data ? (
           <SkeletonRows />
         ) : !data.configured ? (
           <EmptyState
-            title="Pick sync isn't configured"
+            title={`${win === 'week' ? 'Week-to-date' : win === 'month' ? 'Month-to-date' : 'Today'} template isn't configured`}
             body={
               <>
-                Set <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px]">PVX_PICK_TEMPLATE</code>{' '}
-                (and matching column env vars) on the server to power this card.
+                Set <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px]">
+                  PVX_PICK_TEMPLATE_{win === 'week' ? 'WTD' : win === 'month' ? 'MTD' : 'TODAY'}
+                </code>{' '}
+                on the server to a PVX User-activity template filtered to this window.
               </>
             }
           />
-        ) : data.rows.length === 0 ? (
+        ) : ranked.length === 0 ? (
           <EmptyState
-            title={
-              data.totalRows === 0
-                ? 'No pick activity yet'
-                : `No picks in this window`
-            }
+            title={`No ${mode === 'pick' ? 'picking' : 'packing'} activity ${win === 'today' ? 'yet today' : win === 'week' ? 'this week' : 'this month'}`}
             body={
-              data.totalRows === 0
-                ? 'The next PVX sync will populate this card.'
-                : data.latest
-                  ? `Latest pick on record: ${timeAgo(data.latest)}.`
-                  : 'Try a wider window.'
+              data.latest
+                ? `Last refreshed ${timeAgo(data.latest)}.`
+                : 'Awaiting first sync.'
             }
           />
         ) : (
-          <LeaderboardList rows={data.rows} latest={data.latest} />
+          <RankedList rows={ranked} metric={metric} latest={data.latest} />
         )}
       </CardBody>
     </Card>
   )
 }
 
-function LeaderboardList({
+function RankedList({
   rows,
+  metric,
   latest,
 }: {
-  rows: LeaderboardResponse['rows']
+  rows: LeaderboardRow[]
+  metric: MetricCfg
   latest: string | null
 }) {
-  const max = rows[0]?.units || 1
+  const max = (rows[0][metric.primary] as number) || 1
   return (
     <>
       <ul className="space-y-2">
         {rows.map((r, i) => {
-          const pct = Math.max(4, Math.round((r.units / max) * 100))
-          const rankTone =
-            i === 0
-              ? 'bg-brand-grad text-white'
-              : i === 1
-                ? 'bg-good/15 text-good'
-                : i === 2
-                  ? 'bg-warn/15 text-warn'
-                  : 'bg-surface-3 text-muted'
+          const v = r[metric.primary] as number
+          const pct = Math.max(4, Math.round((v / max) * 100))
           return (
             <li
               key={r.picker}
@@ -185,10 +246,16 @@ function LeaderboardList({
               <span
                 className={cn(
                   'grid h-8 w-8 flex-shrink-0 place-items-center rounded-md font-mono text-xs font-bold',
-                  rankTone,
+                  i === 0
+                    ? 'bg-brand-grad text-white shadow-glow'
+                    : i === 1
+                      ? 'bg-good/15 text-good'
+                      : i === 2
+                        ? 'bg-warn/15 text-warn'
+                        : 'bg-surface-3 text-muted',
                 )}
               >
-                {i === 0 ? <Trophy className="h-3.5 w-3.5" /> : i + 1}
+                {i === 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-ink">
@@ -203,13 +270,14 @@ function LeaderboardList({
               </div>
               <div className="text-right">
                 <div className="tnum text-base font-bold text-ink">
-                  {fmtN(r.units)}
+                  {fmtN(v)}
                   <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                    units
+                    {metric.primaryUnit}
                   </span>
                 </div>
                 <div className="text-[11px] text-muted">
-                  {fmtN(r.orders)} orders · {fmtN(r.lines)} lines
+                  {fmtN(r[metric.secondaryA.key] as number)} {metric.secondaryA.label} ·{' '}
+                  {fmtN(r[metric.secondaryB.key] as number)} {metric.secondaryB.label}
                 </div>
               </div>
             </li>
@@ -218,7 +286,7 @@ function LeaderboardList({
       </ul>
       {latest ? (
         <p className="mt-3 text-right text-[11px] text-muted">
-          Latest pick: {timeAgo(latest)}
+          {metric.primaryLabel} · refreshed {timeAgo(latest)}
         </p>
       ) : null}
     </>

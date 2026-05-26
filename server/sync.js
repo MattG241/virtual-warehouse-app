@@ -194,10 +194,11 @@ async function bulkInsert(tx, rows) {
 }
 
 // --- Pick activity sync ---------------------------------------------------
-// PVX's "User activity" report returns cumulative per-user totals (no
-// timestamps), so we snapshot the full table on every sync and compute
-// window-relative leaderboards by diffing snapshots in the query layer.
-// Opt-in via PVX_PICK_TEMPLATE — if blank, this is a no-op.
+// Each time window (today / week-to-date / month-to-date) is driven by its
+// own PVX report template — the date filter lives at the template level.
+// We just read the latest per-user totals each cycle and write them into
+// pick_user_totals (keyed by window). DELETE-then-INSERT per window so
+// pickers who fall out of the report don't linger.
 
 const TOTAL_COLS = [
   // [csv column header,   db column name]
@@ -212,110 +213,128 @@ const TOTAL_COLS = [
   ['Items despatched',         'items_despatched'],
 ];
 
+const ALL_WINDOWS = ['today', 'week', 'month'];
+
 let pickRunning = false;
 export async function runPickSync(opts = {}) {
-  // Optional per-call overrides so we can test alternate templates
-  // (e.g. "User activity - Today") without changing env vars.
-  const template = opts.template || config.pvx.pickTemplate;
-  const columns = opts.columns || config.pvx.pickColumns;
-  if (!template) return { skipped: 'PVX_PICK_TEMPLATE not set' };
   if (pickRunning) return { skipped: 'previous pick sync still running' };
   pickRunning = true;
 
+  // Decide which (window, template) pairs to run. Per-call overrides win.
+  let targets;
+  if (opts.template) {
+    targets = [{ windowKey: opts.windowKey || 'today', template: opts.template }];
+  } else {
+    targets = ALL_WINDOWS
+      .map((w) => ({ windowKey: w, template: config.pvx.pickTemplates[w] }))
+      .filter((t) => t.template);
+  }
+  if (targets.length === 0) {
+    pickRunning = false;
+    return { skipped: 'no pick templates configured' };
+  }
+
   const startedAt = Date.now();
-  console.log(`[pick-sync] starting template="${template}"`);
+  const results = {};
 
   try {
-    const pvx = new PvxClient(config.pvx);
-    const rows = [];
-    let header = null;
-
-    for await (const event of pvx.iterateAllRows({
-      template,
-      columns,
-      pageSize: config.sync.pageSize,
-      pageDelayMs: config.sync.pageDelayMs,
-    })) {
-      if (event.header) {
-        header = event.header;
-        continue;
+    for (const t of targets) {
+      try {
+        const r = await syncOneWindow(t.windowKey, t.template, opts.columns);
+        results[t.windowKey] = r;
+      } catch (e) {
+        console.error(`[pick-sync] ${t.windowKey} failed:`, e.message);
+        results[t.windowKey] = { error: e.message };
       }
-      if (event.row) rows.push(event.row);
     }
-
-    if (!header) {
-      console.log('[pick-sync] no header returned — leaving table as-is');
-      return { skipped: 'no header' };
-    }
-
-    const idx = buildColumnIndex(header);
-    const userCol = config.pvx.pickUserCol;
-
-    if (!(userCol in idx)) {
-      throw new Error(
-        `pick template missing user column "${userCol}". ` +
-          `Available: ${Object.keys(idx).join(', ')}`,
-      );
-    }
-
-    // Map the 9 metric columns once; missing columns become 0 (graceful).
-    const colMap = TOTAL_COLS.map(([csv, db]) => ({
-      db,
-      index: idx[csv],
-    }));
-
-    const snapshotAt = new Date();
-    const mapped = rows
-      .map((r) => {
-        const picker = String(r[idx[userCol]] ?? '').trim();
-        if (!picker) return null;
-        const out = { picker };
-        let activitySum = 0;
-        for (const { db, index } of colMap) {
-          const v = index === undefined ? 0 : toInt(r[index]);
-          out[db] = v;
-          activitySum += v;
-        }
-        // Skip system / dormant users (Admin, Pvx*, etc.) — they always 0.
-        if (activitySum === 0) return null;
-        return out;
-      })
-      .filter(Boolean);
-
-    const tx = await pool.connect();
-    try {
-      await tx.query('BEGIN');
-      await bulkInsertPickTotals(tx, mapped, snapshotAt);
-      // Bound storage: 35 days covers the 30d window with a few days of slack.
-      await tx.query(
-        `DELETE FROM pick_user_totals WHERE snapshot_at < NOW() - INTERVAL '35 days'`,
-      );
-      await tx.query('COMMIT');
-    } catch (e) {
-      await tx.query('ROLLBACK');
-      throw e;
-    } finally {
-      tx.release();
-    }
-
     console.log(
-      `[pick-sync] ok — ${mapped.length} active pickers in ${Date.now() - startedAt}ms`,
+      `[pick-sync] all windows done in ${Date.now() - startedAt}ms — ${JSON.stringify(results)}`,
     );
     publish('picks.completed', {
-      rowCount: mapped.length,
+      results,
       finishedAt: new Date().toISOString(),
     });
-    return { rowCount: mapped.length };
+    return { results };
   } finally {
     pickRunning = false;
   }
 }
 
-async function bulkInsertPickTotals(tx, rows, snapshotAt) {
+async function syncOneWindow(windowKey, template, columnsOverride) {
+  const columns = columnsOverride || config.pvx.pickColumns;
+  console.log(`[pick-sync] ${windowKey}: pulling template="${template}"`);
+
+  const pvx = new PvxClient(config.pvx);
+  const rows = [];
+  let header = null;
+
+  for await (const event of pvx.iterateAllRows({
+    template,
+    columns,
+    pageSize: config.sync.pageSize,
+    pageDelayMs: config.sync.pageDelayMs,
+  })) {
+    if (event.header) {
+      header = event.header;
+      continue;
+    }
+    if (event.row) rows.push(event.row);
+  }
+
+  if (!header) {
+    return { skipped: 'no header' };
+  }
+
+  const idx = buildColumnIndex(header);
+  const userCol = config.pvx.pickUserCol;
+
+  if (!(userCol in idx)) {
+    throw new Error(
+      `pick template missing user column "${userCol}". ` +
+        `Available: ${Object.keys(idx).join(', ')}`,
+    );
+  }
+
+  const colMap = TOTAL_COLS.map(([csv, db]) => ({ db, index: idx[csv] }));
+
+  const mapped = rows
+    .map((r) => {
+      const picker = String(r[idx[userCol]] ?? '').trim();
+      if (!picker) return null;
+      const out = { picker };
+      let activitySum = 0;
+      for (const { db, index } of colMap) {
+        const v = index === undefined ? 0 : toInt(r[index]);
+        out[db] = v;
+        activitySum += v;
+      }
+      // Skip system / dormant users (Admin, Pvx*, etc.) — they always 0.
+      if (activitySum === 0) return null;
+      return out;
+    })
+    .filter(Boolean);
+
+  const tx = await pool.connect();
+  try {
+    await tx.query('BEGIN');
+    await tx.query(`DELETE FROM pick_user_totals WHERE window_key = $1`, [windowKey]);
+    await bulkInsertPickTotals(tx, mapped, windowKey);
+    await tx.query('COMMIT');
+  } catch (e) {
+    await tx.query('ROLLBACK');
+    throw e;
+  } finally {
+    tx.release();
+  }
+
+  return { rowCount: mapped.length, template };
+}
+
+async function bulkInsertPickTotals(tx, rows, windowKey) {
   if (!rows.length) return;
   const cols = TOTAL_COLS.map(([, db]) => db);
-  // Columns per row: picker + 9 metric cols + snapshot_at = 11
-  const colsPerRow = 1 + cols.length + 1;
+  // Columns per row: picker + window_key + 9 metric cols = 11
+  const colsPerRow = 2 + cols.length;
   const chunkSize = 200;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
@@ -325,12 +344,14 @@ async function bulkInsertPickTotals(tx, rows, snapshotAt) {
       const o = j * colsPerRow;
       const placeholders = Array.from({ length: colsPerRow }, (_, k) => `$${o + k + 1}`);
       values.push(`(${placeholders.join(',')})`);
-      params.push(r.picker, ...cols.map((c) => r[c] || 0), snapshotAt);
+      params.push(r.picker, windowKey, ...cols.map((c) => r[c] || 0));
     });
     await tx.query(
-      `INSERT INTO pick_user_totals (picker, ${cols.join(', ')}, snapshot_at)
+      `INSERT INTO pick_user_totals (picker, window_key, ${cols.join(', ')})
        VALUES ${values.join(',')}
-       ON CONFLICT (picker, snapshot_at) DO NOTHING`,
+       ON CONFLICT (picker, window_key) DO UPDATE SET
+         ${cols.map((c) => `${c} = EXCLUDED.${c}`).join(', ')},
+         updated_at = NOW()`,
       params,
     );
   }

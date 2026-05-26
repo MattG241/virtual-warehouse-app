@@ -68,12 +68,15 @@ export async function initSchema() {
       last_login_at TIMESTAMPTZ
     );
 
-    -- Old per-event design replaced by snapshot diffing against
-    -- cumulative totals from PVX's "User activity" report.
+    -- Old designs replaced. Each window (today/week/month) now has its
+    -- own pre-filtered PVX template; we just keep the current totals
+    -- per (picker, window_key) and refresh them on every sync.
     DROP TABLE IF EXISTS pick_activity;
+    DROP TABLE IF EXISTS pick_user_totals;
 
     CREATE TABLE IF NOT EXISTS pick_user_totals (
       picker              TEXT NOT NULL,
+      window_key          TEXT NOT NULL,     -- 'today' | 'week' | 'month'
       picks_completed     INTEGER NOT NULL DEFAULT 0,
       items_picked        INTEGER NOT NULL DEFAULT 0,
       items_skipped       INTEGER NOT NULL DEFAULT 0,
@@ -83,13 +86,11 @@ export async function initSchema() {
       orders_despatched   INTEGER NOT NULL DEFAULT 0,
       packages_despatched INTEGER NOT NULL DEFAULT 0,
       items_despatched    INTEGER NOT NULL DEFAULT 0,
-      snapshot_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (picker, snapshot_at)
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (picker, window_key)
     );
 
-    CREATE INDEX IF NOT EXISTS pick_user_totals_picker_at_idx
-      ON pick_user_totals(picker, snapshot_at DESC);
-    CREATE INDEX IF NOT EXISTS pick_user_totals_at_idx
-      ON pick_user_totals(snapshot_at DESC);
+    CREATE INDEX IF NOT EXISTS pick_user_totals_window_idx
+      ON pick_user_totals(window_key, items_picked DESC);
   `);
 }
