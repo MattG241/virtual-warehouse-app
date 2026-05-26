@@ -150,6 +150,9 @@ export interface OrdersProgress {
   baseline: { day: string; count: number; capturedAt: string } | null
   currentOpen: number | null
   currentOpenAt: string | null
+  /** Same-unit diff: baseline − currentOpen. Drives the bar. */
+  morningCleared: number
+  /** Bonus context — different unit, just for the side label. */
   despatchedToday: number
   percent: number
 }

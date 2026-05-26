@@ -997,7 +997,7 @@ function OrdersProgressBar({
               isLight ? 'text-slate-500' : 'text-white/40',
             )}
           >
-            Today's despatch progress
+            Morning workload
           </p>
           <p
             className={cn(
@@ -1005,7 +1005,7 @@ function OrdersProgressBar({
               isLight ? 'text-slate-400' : 'text-white/40',
             )}
           >
-            {orders.baseline.count} morning orders
+            {orders.baseline.count} open at 8am
           </p>
         </div>
         <div className="flex items-baseline gap-3 font-mono">
@@ -1025,7 +1025,7 @@ function OrdersProgressBar({
               isLight ? 'text-slate-500' : 'text-white/60',
             )}
           >
-            {orders.despatchedToday} / {orders.baseline.count} despatched
+            {orders.morningCleared} / {orders.baseline.count} cleared
           </span>
         </div>
       </div>
@@ -1054,7 +1054,8 @@ function OrdersProgressBar({
         >
           {goalReached
             ? '🎉 Morning backlog cleared'
-            : `${orders.currentOpen} orders still open`}
+            : `${orders.currentOpen} still open`}
+          {' · '}team shipped {orders.despatchedToday} order despatches today
           {' · '}baseline captured {agoLabel(orders.baseline.capturedAt)}
         </p>
       )}

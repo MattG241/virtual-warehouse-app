@@ -260,23 +260,26 @@ app.get('/api/orders/progress', async (_req, res) => {
     );
     const baseline = baselineRes.rows[0] || null;
 
-    // Today's despatched count = sum of orders_despatched across pickers
-    // in the Today snapshot. Falls back to baseline - current_open if
-    // pick data is missing.
+    // Bonus context only — total order-despatch events across pickers
+    // today, from the User activity report. Different units to the
+    // Outstanding-orders count, so we don't use it for the bar.
     const despatchRes = await pool.query(
       `SELECT COALESCE(SUM(orders_despatched), 0)::int AS total
          FROM pick_user_totals
         WHERE window_key = 'today'`,
     );
-    const despatchedFromPicks = despatchRes.rows[0]?.total || 0;
-    const despatchedFromDiff = baseline && state
-      ? Math.max(0, baseline.baseline_count - state.open_count)
-      : 0;
-    const despatched = Math.max(despatchedFromPicks, despatchedFromDiff);
+    const despatchedToday = despatchRes.rows[0]?.total || 0;
 
+    // Bar math stays in one unit: count cleared = baseline - currentOpen.
+    // Caveat: new orders coming in during the day make this an under-
+    // estimate of "what the floor actually shipped", but it tracks the
+    // morning workload honestly.
     const baselineCount = baseline?.baseline_count || 0;
+    const morningCleared = baseline && state
+      ? Math.max(0, baselineCount - state.open_count)
+      : 0;
     const percent = baselineCount > 0
-      ? Math.min(100, Math.round((despatched / baselineCount) * 1000) / 10)
+      ? Math.min(100, Math.round((morningCleared / baselineCount) * 1000) / 10)
       : 0;
 
     res.set('Cache-Control', 'no-store');
@@ -287,7 +290,8 @@ app.get('/api/orders/progress', async (_req, res) => {
         : null,
       currentOpen: state?.open_count ?? null,
       currentOpenAt: state?.updated_at ?? null,
-      despatchedToday: despatched,
+      morningCleared,
+      despatchedToday,
       percent,
     });
   } catch (e) {
