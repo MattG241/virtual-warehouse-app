@@ -72,27 +72,32 @@ Add these to Railway → service → **Variables**:
 
 That's it — no external email service required. Passwords are hashed with scrypt (Node built-in) and stored in the `users` table. Anyone whose email is in `ALLOWED_EMAILS` can hit **Sign in → Create one** on first visit, pick a password, and they're in. Subsequent visits use email + password.
 
-### Picking leaderboard (optional)
+### Picking leaderboard
 
-The dashboard can also rank pickers by units picked over Today / Last 7d / Last 30d windows. It's off by default — set `PVX_PICK_TEMPLATE` to a PVX report that surfaces per-pick rows with a picker, quantity, and timestamp:
+The dashboard ranks pickers by units picked over Today / Last 7d / Last 30d windows. It runs by default against PVX's built-in **`User activity`** report, which returns cumulative per-user totals (Picks completed, Items picked, Items moved, Orders despatched, etc.).
 
-| Variable                  | Value                                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `PVX_PICK_TEMPLATE`       | Name of the PVX report template (e.g. `Pick activity by user`). Leave blank to disable the leaderboard.        |
-| `PVX_PICK_COLUMNS`        | Default: `[Picked by],[Order Number],[Item Code],[Quantity],[Picked on]`. Adjust to match your template.       |
-| `PVX_PICK_USER_COL`       | Column name (inside `PVX_PICK_COLUMNS`) holding the picker. Default `Picked by`.                               |
-| `PVX_PICK_UNITS_COL`      | Column holding units per pick. Default `Quantity`.                                                             |
-| `PVX_PICK_TIMESTAMP_COL`  | Column holding the pick timestamp. Default `Picked on`. Accepts ISO or `DD/MM/YYYY HH:mm:ss`.                  |
-| `PVX_PICK_ORDER_COL`      | Column holding the order number, used to count distinct orders. Default `Order Number`. Optional.              |
+| Variable             | Default                                                                                                                                                                                                                | Notes                                                                                       |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `PVX_PICK_TEMPLATE`  | `User activity`                                                                                                                                                                                                        | Set to empty string to disable the leaderboard entirely.                                    |
+| `PVX_PICK_COLUMNS`   | `[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]`                                 | Override if your template renames columns.                                                  |
+| `PVX_PICK_USER_COL`  | `UserName`                                                                                                                                                                                                             | The column name holding the picker.                                                         |
 
-The pick sync runs after each inventory sync (same 5-min cadence) using a TRUNCATE + bulk insert into `pick_activity`. The leaderboard endpoint then aggregates by picker and time window.
+**How the time-window leaderboard works.** The User activity report only gives totals, not per-event timestamps. The sync therefore snapshots the whole table into `pick_user_totals` (one row per user per sync, append-only). The `/api/leaderboard` endpoint then computes window activity as:
+
+```
+latest_snapshot - newest_snapshot_taken_before_window_start
+```
+
+So "Today" = current totals minus whatever the totals were at midnight. "Last 7d" diffs against 7 days ago, etc. Pickers without a pre-window snapshot are excluded for that window (they'll appear once history catches up — typically the next sync). Old snapshots are pruned after 35 days.
+
+Rows where every metric is 0 (Admin, `Pvx*`, dormant accounts) are dropped at ingest, so the leaderboard only shows real activity.
 
 Endpoints:
 
-- `GET /api/leaderboard?window=today|week|month&limit=10` — ranked list `[{picker, units, lines, orders}]`. The `configured`, `totalRows`, and `latest` fields help the UI distinguish "not set up" from "no data yet".
-- `POST /api/picks/sync-now` — kick off a one-off pick sync (handy after changing the template/columns env vars).
+- `GET /api/leaderboard?window=today|week|month&limit=10` — ranked list `[{picker, units, lines, orders}]`. `units` = Items picked, `lines` = Picks completed, `orders` = Orders despatched. The `configured`, `totalRows`, and `latest` fields help the UI distinguish "not set up" from "no data yet".
+- `POST /api/picks/sync-now` — kick off a one-off pick sync (handy after changing the template/columns env vars or to seed an extra snapshot).
 
-If your PVX tenant uses different column headers, set `PVX_PICK_COLUMNS` to whatever your template exposes and point the `*_COL` env vars at the matching headers. The first sync will log the full available header list if columns are missing, so you can copy the exact names.
+If your PVX tenant uses different column headers, override `PVX_PICK_COLUMNS` and (if needed) `PVX_PICK_USER_COL`. The first sync logs the available headers if a required column is missing, so you can copy the exact names.
 
 ### Slack alerts (optional)
 

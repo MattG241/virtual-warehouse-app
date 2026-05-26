@@ -68,16 +68,28 @@ export async function initSchema() {
       last_login_at TIMESTAMPTZ
     );
 
-    CREATE TABLE IF NOT EXISTS pick_activity (
-      id            BIGSERIAL PRIMARY KEY,
-      picker        TEXT NOT NULL,
-      order_number  TEXT NOT NULL DEFAULT '',
-      item_code     TEXT NOT NULL DEFAULT '',
-      units         INTEGER NOT NULL DEFAULT 0,
-      picked_at     TIMESTAMPTZ NOT NULL
+    -- Old per-event design replaced by snapshot diffing against
+    -- cumulative totals from PVX's "User activity" report.
+    DROP TABLE IF EXISTS pick_activity;
+
+    CREATE TABLE IF NOT EXISTS pick_user_totals (
+      picker              TEXT NOT NULL,
+      picks_completed     INTEGER NOT NULL DEFAULT 0,
+      items_picked        INTEGER NOT NULL DEFAULT 0,
+      items_skipped       INTEGER NOT NULL DEFAULT 0,
+      containers_moved    INTEGER NOT NULL DEFAULT 0,
+      item_movements      INTEGER NOT NULL DEFAULT 0,
+      items_moved         INTEGER NOT NULL DEFAULT 0,
+      orders_despatched   INTEGER NOT NULL DEFAULT 0,
+      packages_despatched INTEGER NOT NULL DEFAULT 0,
+      items_despatched    INTEGER NOT NULL DEFAULT 0,
+      snapshot_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (picker, snapshot_at)
     );
 
-    CREATE INDEX IF NOT EXISTS pick_activity_picked_at_idx ON pick_activity(picked_at DESC);
-    CREATE INDEX IF NOT EXISTS pick_activity_picker_idx ON pick_activity(picker);
+    CREATE INDEX IF NOT EXISTS pick_user_totals_picker_at_idx
+      ON pick_user_totals(picker, snapshot_at DESC);
+    CREATE INDEX IF NOT EXISTS pick_user_totals_at_idx
+      ON pick_user_totals(snapshot_at DESC);
   `);
 }

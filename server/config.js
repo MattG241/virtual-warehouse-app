@@ -20,18 +20,14 @@ function loadConfig() {
         process.env.PVX_COLUMNS ||
         '[Item Code],[Name],[Stock Count],[Container Barcode],[Location barcode],[Site reference],[Location type],[Item type group],[Item Barcode]',
       // --- Picking leaderboard (optional) ---------------------------------
-      // Leave PVX_PICK_TEMPLATE blank to disable pick sync entirely.
-      // PVX_PICK_*_COL values name the columns inside PVX_PICK_COLUMNS used
-      // for picker, units and timestamp — defaults are guesses; override to
-      // match the actual report template in your PVX tenant.
-      pickTemplate: process.env.PVX_PICK_TEMPLATE || '',
+      // Pulls PVX's "User activity" report (cumulative per-user totals) and
+      // snapshots it each sync so the API can diff over time windows.
+      // Set PVX_PICK_TEMPLATE to '' to disable.
+      pickTemplate: process.env.PVX_PICK_TEMPLATE || 'User activity',
       pickColumns:
         process.env.PVX_PICK_COLUMNS ||
-        '[Picked by],[Order Number],[Item Code],[Quantity],[Picked on]',
-      pickUserCol: process.env.PVX_PICK_USER_COL || 'Picked by',
-      pickUnitsCol: process.env.PVX_PICK_UNITS_COL || 'Quantity',
-      pickTimestampCol: process.env.PVX_PICK_TIMESTAMP_COL || 'Picked on',
-      pickOrderCol: process.env.PVX_PICK_ORDER_COL || 'Order Number',
+        '[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]',
+      pickUserCol: process.env.PVX_PICK_USER_COL || 'UserName',
     },
     sync: {
       intervalMs: Number(process.env.SYNC_INTERVAL_MS || 300000),

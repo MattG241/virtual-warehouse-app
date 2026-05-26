@@ -194,9 +194,24 @@ async function bulkInsert(tx, rows) {
 }
 
 // --- Pick activity sync ---------------------------------------------------
-// Pulls a separate PVX report template (e.g. "Pick activity by user") into
-// the pick_activity table. Opt-in via PVX_PICK_TEMPLATE — if blank, this is
-// a no-op. Truncate + bulk insert, same model as the inventory sync.
+// PVX's "User activity" report returns cumulative per-user totals (no
+// timestamps), so we snapshot the full table on every sync and compute
+// window-relative leaderboards by diffing snapshots in the query layer.
+// Opt-in via PVX_PICK_TEMPLATE — if blank, this is a no-op.
+
+const TOTAL_COLS = [
+  // [csv column header,   db column name]
+  ['Picks completed',          'picks_completed'],
+  ['Items picked',             'items_picked'],
+  ['Items skipped',            'items_skipped'],
+  ['Containers moved',         'containers_moved'],
+  ['Item movements performed', 'item_movements'],
+  ['Items moved',              'items_moved'],
+  ['Orders despatched',        'orders_despatched'],
+  ['Packages despatched',      'packages_despatched'],
+  ['Items despatched',         'items_despatched'],
+];
+
 let pickRunning = false;
 export async function runPickSync() {
   if (!config.pvx.pickTemplate) return { skipped: 'PVX_PICK_TEMPLATE not set' };
@@ -231,39 +246,46 @@ export async function runPickSync() {
 
     const idx = buildColumnIndex(header);
     const userCol = config.pvx.pickUserCol;
-    const unitsCol = config.pvx.pickUnitsCol;
-    const tsCol = config.pvx.pickTimestampCol;
-    const orderCol = config.pvx.pickOrderCol;
 
-    const missing = [userCol, unitsCol, tsCol].filter((n) => !(n in idx));
-    if (missing.length) {
+    if (!(userCol in idx)) {
       throw new Error(
-        `pick template missing required columns: ${missing.join(', ')}. ` +
+        `pick template missing user column "${userCol}". ` +
           `Available: ${Object.keys(idx).join(', ')}`,
       );
     }
 
+    // Map the 9 metric columns once; missing columns become 0 (graceful).
+    const colMap = TOTAL_COLS.map(([csv, db]) => ({
+      db,
+      index: idx[csv],
+    }));
+
+    const snapshotAt = new Date();
     const mapped = rows
       .map((r) => {
-        const ts = parsePvxDate(r[idx[tsCol]]);
-        if (!ts) return null;
         const picker = String(r[idx[userCol]] ?? '').trim();
         if (!picker) return null;
-        return {
-          picker,
-          order_number: orderCol in idx ? String(r[idx[orderCol]] ?? '').trim() : '',
-          item_code: 'Item Code' in idx ? String(r[idx['Item Code']] ?? '').trim() : '',
-          units: toInt(r[idx[unitsCol]]),
-          picked_at: ts,
-        };
+        const out = { picker };
+        let activitySum = 0;
+        for (const { db, index } of colMap) {
+          const v = index === undefined ? 0 : toInt(r[index]);
+          out[db] = v;
+          activitySum += v;
+        }
+        // Skip system / dormant users (Admin, Pvx*, etc.) — they always 0.
+        if (activitySum === 0) return null;
+        return out;
       })
       .filter(Boolean);
 
     const tx = await pool.connect();
     try {
       await tx.query('BEGIN');
-      await tx.query('TRUNCATE TABLE pick_activity');
-      await bulkInsertPicks(tx, mapped);
+      await bulkInsertPickTotals(tx, mapped, snapshotAt);
+      // Bound storage: 35 days covers the 30d window with a few days of slack.
+      await tx.query(
+        `DELETE FROM pick_user_totals WHERE snapshot_at < NOW() - INTERVAL '35 days'`,
+      );
       await tx.query('COMMIT');
     } catch (e) {
       await tx.query('ROLLBACK');
@@ -273,7 +295,7 @@ export async function runPickSync() {
     }
 
     console.log(
-      `[pick-sync] ok — ${mapped.length} pick rows in ${Date.now() - startedAt}ms`,
+      `[pick-sync] ok — ${mapped.length} active pickers in ${Date.now() - startedAt}ms`,
     );
     publish('picks.completed', {
       rowCount: mapped.length,
@@ -285,38 +307,26 @@ export async function runPickSync() {
   }
 }
 
-function parsePvxDate(raw) {
-  if (!raw) return null;
-  const s = String(raw).trim();
-  if (!s) return null;
-  // Native first — handles ISO and "YYYY-MM-DD HH:mm:ss".
-  let d = new Date(s);
-  if (!Number.isNaN(d.getTime())) return d.toISOString();
-  // Common PVX format: DD/MM/YYYY HH:mm:ss (AU locale).
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (m) {
-    const [, dd, mm, yyyy, hh = '0', mi = '0', ss = '0'] = m;
-    d = new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +mi, +ss));
-    if (!Number.isNaN(d.getTime())) return d.toISOString();
-  }
-  return null;
-}
-
-async function bulkInsertPicks(tx, rows) {
+async function bulkInsertPickTotals(tx, rows, snapshotAt) {
   if (!rows.length) return;
-  const chunkSize = 500;
+  const cols = TOTAL_COLS.map(([, db]) => db);
+  // Columns per row: picker + 9 metric cols + snapshot_at = 11
+  const colsPerRow = 1 + cols.length + 1;
+  const chunkSize = 200;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
     const values = [];
     const params = [];
     chunk.forEach((r, j) => {
-      const o = j * 5;
-      values.push(`($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5})`);
-      params.push(r.picker, r.order_number, r.item_code, r.units, r.picked_at);
+      const o = j * colsPerRow;
+      const placeholders = Array.from({ length: colsPerRow }, (_, k) => `$${o + k + 1}`);
+      values.push(`(${placeholders.join(',')})`);
+      params.push(r.picker, ...cols.map((c) => r[c] || 0), snapshotAt);
     });
     await tx.query(
-      `INSERT INTO pick_activity (picker, order_number, item_code, units, picked_at)
-       VALUES ${values.join(',')}`,
+      `INSERT INTO pick_user_totals (picker, ${cols.join(', ')}, snapshot_at)
+       VALUES ${values.join(',')}
+       ON CONFLICT (picker, snapshot_at) DO NOTHING`,
       params,
     );
   }

@@ -213,27 +213,47 @@ app.get('/api/leaderboard', async (req, res) => {
   const windowKey = allowed.has(String(req.query.window)) ? req.query.window : 'today';
   const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
 
-  const sinceClause = {
-    today: "picked_at >= date_trunc('day', NOW())",
-    week: "picked_at >= NOW() - INTERVAL '7 days'",
-    month: "picked_at >= NOW() - INTERVAL '30 days'",
+  // PVX gives us cumulative totals — to get "activity within a window" we
+  // diff the latest snapshot against the newest snapshot taken before the
+  // window started. Users without a pre-window baseline are excluded from
+  // that window's leaderboard until they accumulate history.
+  const windowStartExpr = {
+    today: "date_trunc('day', NOW())",
+    week: "NOW() - INTERVAL '7 days'",
+    month: "NOW() - INTERVAL '30 days'",
   }[windowKey];
 
+  const sql = `
+    WITH latest AS (
+      SELECT DISTINCT ON (picker)
+        picker, items_picked, picks_completed, orders_despatched, snapshot_at
+      FROM pick_user_totals
+      ORDER BY picker, snapshot_at DESC
+    ),
+    baseline AS (
+      SELECT DISTINCT ON (picker)
+        picker, items_picked, picks_completed, orders_despatched
+      FROM pick_user_totals
+      WHERE snapshot_at < ${windowStartExpr}
+      ORDER BY picker, snapshot_at DESC
+    )
+    SELECT
+      l.picker,
+      GREATEST(l.items_picked      - COALESCE(b.items_picked, l.items_picked), 0)::int           AS units,
+      GREATEST(l.picks_completed   - COALESCE(b.picks_completed, l.picks_completed), 0)::int    AS lines,
+      GREATEST(l.orders_despatched - COALESCE(b.orders_despatched, l.orders_despatched), 0)::int AS orders
+    FROM latest l
+    LEFT JOIN baseline b ON b.picker = l.picker
+    WHERE b.picker IS NOT NULL
+      AND (l.items_picked - b.items_picked) > 0
+    ORDER BY units DESC, lines DESC
+    LIMIT $1`;
+
   try {
-    const r = await pool.query(
-      `SELECT picker,
-              SUM(units)::int                     AS units,
-              COUNT(*)::int                       AS lines,
-              COUNT(DISTINCT NULLIF(order_number, ''))::int AS orders
-         FROM pick_activity
-        WHERE ${sinceClause}
-        GROUP BY picker
-        ORDER BY units DESC, lines DESC
-        LIMIT $1`,
-      [limit],
-    );
+    const r = await pool.query(sql, [limit]);
     const totals = await pool.query(
-      `SELECT COUNT(*)::int AS total_rows, MAX(picked_at) AS latest FROM pick_activity`,
+      `SELECT COUNT(DISTINCT picker)::int AS total_rows, MAX(snapshot_at) AS latest
+         FROM pick_user_totals`,
     );
     res.set('Cache-Control', 'no-store');
     res.json({
