@@ -1008,21 +1008,21 @@ function BadgeLegend({
       >
         Earn
       </span>
-      <ul className="grid flex-1 grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-6 sm:gap-x-4">
+      <ul className="grid flex-1 grid-cols-2 gap-x-3 gap-y-2 md:grid-cols-3 lg:grid-cols-6 lg:gap-x-4">
         {LEGEND_ORDER.map((key) => {
           const meta = BADGES[key]
           return (
-            <li key={key} className="flex items-center gap-2 sm:gap-2.5">
+            <li key={key} className="flex items-center gap-2 lg:gap-2.5">
               <img
                 src={meta.imageUrl}
                 alt={meta.label}
-                className="h-9 w-9 flex-shrink-0 sm:h-10 sm:w-10"
+                className="h-9 w-9 flex-shrink-0 lg:h-10 lg:w-10"
                 draggable={false}
               />
               <div className="min-w-0 leading-tight">
                 <div
                   className={cn(
-                    'text-[11px] font-bold uppercase tracking-wider sm:text-sm sm:truncate',
+                    'text-[11px] font-bold uppercase tracking-wider lg:text-sm lg:truncate',
                     isLight ? 'text-slate-900' : 'text-white',
                   )}
                 >
@@ -1030,7 +1030,7 @@ function BadgeLegend({
                 </div>
                 <div
                   className={cn(
-                    'text-[10px] sm:text-xs sm:truncate',
+                    'text-[10px] lg:text-xs lg:truncate',
                     isLight ? 'text-slate-500' : 'text-white/50',
                   )}
                 >
@@ -1248,7 +1248,7 @@ function NewsTicker({
         <div
           key={safeIdx}
           className={cn(
-            'text-[13px] font-semibold leading-snug sm:truncate sm:text-base sm:leading-normal',
+            'text-[13px] font-semibold leading-snug sm:text-sm xl:truncate xl:text-base xl:leading-normal',
             isLight ? 'text-slate-700' : 'text-white/80',
           )}
           style={{ animation: 'tickerSlide 500ms cubic-bezier(0.16,1,0.3,1) both' }}
