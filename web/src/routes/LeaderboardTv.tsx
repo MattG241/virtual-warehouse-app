@@ -6,6 +6,7 @@ import {
   fetchLeaderboard, fetchOrdersProgress,
   type LeaderboardRow, type LeaderboardWindow, type OrdersProgress,
 } from '@/lib/api'
+import { BADGES, badgesFor, type BadgeKey } from '@/lib/badges'
 import { useTheme } from '@/store/theme'
 
 // ─── Config ─────────────────────────────────────────────────────────────
@@ -382,7 +383,7 @@ export function LeaderboardTv() {
             </Centered>
           ) : (
             <>
-              <Podium top={topThree} board={board} isLight={isLight} key={`${mode}-${win}-podium`} />
+              <Podium top={topThree} board={board} isLight={isLight} win={win} key={`${mode}-${win}-podium`} />
               {rest.length > 0 && (
                 <ol className="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-3">
                   {rest.map((r, i) => (
@@ -392,6 +393,7 @@ export function LeaderboardTv() {
                       rank={i + 4}
                       board={board}
                       isLight={isLight}
+                      win={win}
                     />
                   ))}
                 </ol>
@@ -502,47 +504,50 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 function Podium({
-  top, board, isLight,
+  top, board, isLight, win,
 }: {
   top: LeaderboardRow[]
   board: BoardConfig
   isLight: boolean
+  win: LeaderboardWindow
 }) {
   return (
     <>
       {/* Mobile / small screens — stacked */}
       <div className="flex flex-col gap-3 md:hidden">
-        <MobilePodiumHero row={top[0]} board={board} isLight={isLight} />
+        <MobilePodiumHero row={top[0]} board={board} isLight={isLight} win={win} />
         {(top[1] || top[2]) && (
           <div className="grid grid-cols-2 gap-3">
-            <MobilePodiumCard row={top[1]} rank={2} board={board} isLight={isLight} delayMs={140} />
-            <MobilePodiumCard row={top[2]} rank={3} board={board} isLight={isLight} delayMs={220} />
+            <MobilePodiumCard row={top[1]} rank={2} board={board} isLight={isLight} win={win} delayMs={140} />
+            <MobilePodiumCard row={top[2]} rank={3} board={board} isLight={isLight} win={win} delayMs={220} />
           </div>
         )}
       </div>
 
       {/* Desktop / TV — classic 3-pillar podium */}
       <div className="hidden grid-cols-3 items-end gap-6 md:grid xl:gap-10">
-        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} isLight={isLight} delayMs={140} />
-        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} isLight={isLight} delayMs={0} />
-        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} isLight={isLight} delayMs={280} />
+        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} isLight={isLight} win={win} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} isLight={isLight} win={win} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} isLight={isLight} win={win} delayMs={280} />
       </div>
     </>
   )
 }
 
 function PodiumColumn({
-  row, rank, height, board, isLight, delayMs,
+  row, rank, height, board, isLight, win, delayMs,
 }: {
   row: LeaderboardRow | undefined
   rank: number
   height: string
   board: BoardConfig
   isLight: boolean
+  win: LeaderboardWindow
   delayMs: number
 }) {
   const isWinner = rank === 1
   const metalGradient = METAL_BY_RANK[rank]
+  const badges = row ? badgesFor(row, rank, win) : []
 
   return (
     <div
@@ -585,6 +590,9 @@ function PodiumColumn({
             >
               {board.metricLabel}
             </div>
+            {badges.length > 0 && (
+              <BadgeRow badges={badges} size={isWinner ? 'lg' : 'md'} />
+            )}
           </>
         ) : (
           <>
@@ -650,8 +658,9 @@ function PodiumColumn({
 }
 
 function MobilePodiumHero({
-  row, board, isLight,
-}: { row: LeaderboardRow | undefined; board: BoardConfig; isLight: boolean }) {
+  row, board, isLight, win,
+}: { row: LeaderboardRow | undefined; board: BoardConfig; isLight: boolean; win: LeaderboardWindow }) {
+  const badges = row ? badgesFor(row, 1, win) : []
   if (!row) {
     return (
       <div className={cn('rounded-2xl p-5 text-center ring-1',
@@ -689,19 +698,26 @@ function MobilePodiumHero({
       <p className="relative z-10 mt-4 text-[clamp(1.8rem,7vw,2.8rem)] font-black uppercase leading-tight text-black/90 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
         {row.picker}
       </p>
+      {badges.length > 0 && (
+        <div className="relative z-10 mt-3">
+          <BadgeRow badges={badges} size="md" align="start" onDark={false} />
+        </div>
+      )}
     </div>
   )
 }
 
 function MobilePodiumCard({
-  row, rank, board, isLight, delayMs,
+  row, rank, board, isLight, win, delayMs,
 }: {
   row: LeaderboardRow | undefined
   rank: number
   board: BoardConfig
   isLight: boolean
+  win: LeaderboardWindow
   delayMs: number
 }) {
+  const badges = row ? badgesFor(row, rank, win) : []
   const metalGradient = METAL_BY_RANK[rank]
   const textColor = rank === 3 ? 'text-amber-50' : 'text-slate-900'
   const subText = rank === 3 ? 'text-amber-200/80' : 'text-slate-700/80'
@@ -743,6 +759,11 @@ function MobilePodiumCard({
           {board.metricLabel}
         </div>
       )}
+      {badges.length > 0 && (
+        <div className="relative z-10 mt-2">
+          <BadgeRow badges={badges} size="sm" align="start" onDark={false} />
+        </div>
+      )}
     </div>
   )
 }
@@ -780,13 +801,15 @@ function MedalChip({ rank }: { rank: number }) {
 }
 
 function RestRow({
-  row, rank, board, isLight,
+  row, rank, board, isLight, win,
 }: {
   row: LeaderboardRow
   rank: number
   board: BoardConfig
   isLight: boolean
+  win: LeaderboardWindow
 }) {
+  const badges = badgesFor(row, rank, win)
   return (
     <li
       className={cn(
@@ -806,9 +829,14 @@ function RestRow({
         {rank}
       </span>
       <div className="min-w-0 flex-1">
-        <div className={cn('truncate text-xl font-bold sm:text-2xl xl:text-3xl',
-          isLight ? 'text-slate-900' : 'text-white')}>
-          {row.picker}
+        <div className="flex items-center gap-3">
+          <div className={cn('truncate text-xl font-bold sm:text-2xl xl:text-3xl',
+            isLight ? 'text-slate-900' : 'text-white')}>
+            {row.picker}
+          </div>
+          {badges.length > 0 && (
+            <BadgeRow badges={badges} size="xs" align="start" onDark={!isLight} />
+          )}
         </div>
       </div>
       <div className="text-right">
@@ -871,6 +899,68 @@ function Dot({ active, accent }: { active: boolean; accent: string }) {
         active ? cn('w-8', accent) : 'w-2 bg-current opacity-20',
       )}
     />
+  )
+}
+
+// ─── Badge row ──────────────────────────────────────────────────────────
+
+const BADGE_PX: Record<'xs' | 'sm' | 'md' | 'lg', string> = {
+  xs: 'h-6 w-6 sm:h-7 sm:w-7',
+  sm: 'h-9 w-9',
+  md: 'h-11 w-11 sm:h-12 sm:w-12',
+  lg: 'h-14 w-14 sm:h-16 sm:w-16',
+}
+
+function BadgeRow({
+  badges, size, align = 'center', onDark = false, max = 4,
+}: {
+  badges: BadgeKey[]
+  size: 'xs' | 'sm' | 'md' | 'lg'
+  align?: 'center' | 'start'
+  onDark?: boolean
+  max?: number
+}) {
+  if (badges.length === 0) return null
+  const visible = badges.slice(0, max)
+  const overflow = Math.max(0, badges.length - max)
+  return (
+    <div
+      className={cn(
+        'mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2',
+        align === 'center' ? 'justify-center' : 'justify-start',
+      )}
+    >
+      {visible.map((key) => {
+        const meta = BADGES[key]
+        return (
+          <img
+            key={key}
+            src={meta.imageUrl}
+            alt={meta.label}
+            title={`${meta.label} — ${meta.description}`}
+            className={cn(
+              'flex-shrink-0 select-none drop-shadow-[0_3px_10px_rgba(0,0,0,0.45)]',
+              BADGE_PX[size],
+            )}
+            loading="lazy"
+            draggable={false}
+          />
+        )
+      })}
+      {overflow > 0 && (
+        <span
+          className={cn(
+            'inline-flex items-center justify-center rounded-full px-2 text-xs font-bold tabular-nums',
+            BADGE_PX[size].replace(/w-\S+/g, '').replace(/h-\S+/g, ''),
+            onDark
+              ? 'bg-white/10 text-white/80 ring-1 ring-white/15'
+              : 'bg-slate-900/15 text-slate-700 ring-1 ring-slate-300',
+          )}
+        >
+          +{overflow}
+        </span>
+      )}
+    </div>
   )
 }
 

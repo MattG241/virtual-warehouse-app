@@ -9,6 +9,7 @@ import {
   type LeaderboardRow,
   type LeaderboardWindow,
 } from '@/lib/api'
+import { BADGES, badgesFor } from '@/lib/badges'
 import { fmtN, timeAgo } from '@/lib/inventory'
 
 type Mode = 'pick' | 'pack'
@@ -209,7 +210,7 @@ export function LeaderboardWidget() {
             }
           />
         ) : (
-          <RankedList rows={ranked} metric={metric} latest={data.latest} />
+          <RankedList rows={ranked} metric={metric} latest={data.latest} win={win} />
         )}
       </CardBody>
     </Card>
@@ -220,10 +221,12 @@ function RankedList({
   rows,
   metric,
   latest,
+  win,
 }: {
   rows: LeaderboardRow[]
   metric: MetricCfg
   latest: string | null
+  win: LeaderboardWindow
 }) {
   const max = (rows[0][metric.primary] as number) || 1
   return (
@@ -232,6 +235,7 @@ function RankedList({
         {rows.map((r, i) => {
           const v = r[metric.primary] as number
           const pct = Math.max(4, Math.round((v / max) * 100))
+          const badges = badgesFor(r, i + 1, win)
           return (
             <li
               key={r.picker}
@@ -252,8 +256,20 @@ function RankedList({
                 {i === 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-ink">
-                  {r.picker}
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-sm font-semibold text-ink">
+                    {r.picker}
+                  </span>
+                  {badges.slice(0, 3).map((b) => (
+                    <img
+                      key={b}
+                      src={BADGES[b].imageUrl}
+                      alt={BADGES[b].label}
+                      title={`${BADGES[b].label} — ${BADGES[b].description}`}
+                      className="h-5 w-5 flex-shrink-0"
+                      draggable={false}
+                    />
+                  ))}
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
                   <div

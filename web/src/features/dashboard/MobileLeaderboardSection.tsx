@@ -8,6 +8,7 @@ import {
   type LeaderboardRow,
   type LeaderboardWindow,
 } from '@/lib/api'
+import { BADGES, badgesFor } from '@/lib/badges'
 import { fmtN, timeAgo } from '@/lib/inventory'
 
 type Mode = 'pick' | 'pack'
@@ -171,7 +172,7 @@ export function MobileLeaderboardSection() {
             const v = r[metric.primary] as number
             const pct = Math.max(4, Math.round((v / max) * 100))
             return (
-              <Row key={r.picker} row={r} rank={i + 1} pct={pct} v={v} metric={metric} />
+              <Row key={r.picker} row={r} rank={i + 1} pct={pct} v={v} metric={metric} win={win} />
             )
           })}
         </ul>
@@ -187,14 +188,16 @@ export function MobileLeaderboardSection() {
 }
 
 function Row({
-  row, rank, pct, v, metric,
+  row, rank, pct, v, metric, win,
 }: {
   row: LeaderboardRow
   rank: number
   pct: number
   v: number
   metric: MetricCfg
+  win: LeaderboardWindow
 }) {
+  const badges = badgesFor(row, rank, win)
   return (
     <li className="flex items-center gap-3 rounded-xl bg-surface/60 px-3 py-2.5 active:bg-surface-2">
       <span
@@ -212,7 +215,19 @@ function Row({
         {rank === 1 ? <Crown className="h-3.5 w-3.5" /> : rank}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-ink">{row.picker}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-semibold text-ink">{row.picker}</span>
+          {badges.slice(0, 3).map((b) => (
+            <img
+              key={b}
+              src={BADGES[b].imageUrl}
+              alt={BADGES[b].label}
+              title={`${BADGES[b].label} — ${BADGES[b].description}`}
+              className="h-5 w-5 flex-shrink-0"
+              draggable={false}
+            />
+          ))}
+        </div>
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
           <div
             className="h-full rounded-full bg-brand-grad transition-all"
