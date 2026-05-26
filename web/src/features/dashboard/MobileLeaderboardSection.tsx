@@ -89,12 +89,17 @@ export function MobileLeaderboardSection() {
       <button
         type="button"
         onClick={() => navigate('/leaderboard')}
-        className="mb-2 flex w-full items-baseline justify-between px-1"
+        className="mb-2 flex w-full items-end justify-between px-1"
         aria-label="Open warehouse TV leaderboard"
       >
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Picker leaderboard
-        </h3>
+        <div className="text-left">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+            {mode === 'pick' ? 'Picking' : 'Packing'}
+          </p>
+          <h3 className="text-sm font-semibold text-ink">
+            Warehouse leaderboard
+          </h3>
+        </div>
         <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand">
           TV view <ChevronRight className="h-3.5 w-3.5" />
         </span>
