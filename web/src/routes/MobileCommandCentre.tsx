@@ -16,6 +16,7 @@ import {
 } from '@/lib/inventory'
 import { fetchSyncStatus, type SyncRun } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { MobileLeaderboardSection } from '@/features/dashboard/MobileLeaderboardSection'
 
 export function MobileCommandCentre() {
   const inv = useInventory((s) => s.inventory)
@@ -72,6 +73,9 @@ export function MobileCommandCentre() {
         <StatTile label="Empty slots" value={fmtN(summary.emptySlots)} tone="info" />
         <StatTile label="Low" value={fmtN(summary.lowSlots)} tone="warn" />
       </section>
+
+      {/* Picker / packer leaderboard */}
+      <MobileLeaderboardSection />
 
       {/* Replenishment list — iOS Settings style */}
       <ListGroup

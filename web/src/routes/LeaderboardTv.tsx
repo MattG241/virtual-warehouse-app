@@ -179,7 +179,7 @@ export function LeaderboardTv() {
   })
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-[#070a13] text-white">
+    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-[#070a13] text-white">
       {/* Subtle radial vignette */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -202,66 +202,70 @@ export function LeaderboardTv() {
       <button
         type="button"
         onClick={() => navigate('/')}
-        className="absolute right-6 top-6 z-30 grid h-11 w-11 place-items-center rounded-full bg-white/[0.04] text-white/50 ring-1 ring-white/10 backdrop-blur transition hover:bg-white/10 hover:text-white"
+        className="fixed right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-full bg-white/[0.04] text-white/50 ring-1 ring-white/10 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
         aria-label="Close"
         title="Esc"
       >
-        <X className="h-5 w-5" />
+        <X className="h-4 w-4 sm:h-5 sm:w-5" />
       </button>
 
-      <div className="relative z-10 flex h-full flex-col p-8 xl:p-12">
+      <div className="relative z-10 flex h-full flex-col p-4 sm:p-6 xl:p-12">
         {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="flex items-center justify-between border-b border-white/10 pb-6">
-          <div className="flex items-center gap-5">
-            <div className="grid h-14 w-14 place-items-center rounded-xl bg-white/[0.06] ring-1 ring-white/10">
-              <Trophy className="h-7 w-7 text-white/70" />
+        <header className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:pb-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.06] ring-1 ring-white/10 sm:h-14 sm:w-14">
+              <Trophy className="h-5 w-5 text-white/70 sm:h-7 sm:w-7" />
             </div>
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-white/40">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/40 sm:text-[11px] sm:tracking-[0.32em]">
                 Ryderwear Warehouse
               </p>
-              <h1 className="mt-0.5 text-[clamp(1.6rem,2.4vw,2.6rem)] font-bold leading-tight text-white">
+              <h1 className="mt-0.5 text-[clamp(1.1rem,4.5vw,2.6rem)] font-bold leading-tight text-white">
                 Operations Leaderboard
               </h1>
             </div>
           </div>
-          <div className="text-right">
-            <div className="font-mono text-[clamp(2.5rem,4vw,4.5rem)] font-bold leading-none text-white tabular-nums tracking-tight">
+          <div className="flex items-end justify-between gap-3 md:flex-col md:items-end md:text-right">
+            <div className="font-mono text-[clamp(2rem,9vw,4.5rem)] font-bold leading-none text-white tabular-nums tracking-tight">
               {timeStr}
             </div>
-            <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/50">{dateStr}</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/50 sm:text-xs">
+              {dateStr}
+            </p>
           </div>
         </header>
 
         {/* ── Toolbar row: mode + windows ───────────────────────── */}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-4 flex flex-col gap-3 sm:mt-6 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
           {/* Big category title */}
-          <div className="flex items-baseline gap-4">
-            <board.Icon className={cn('h-10 w-10', board.accent.text)} />
+          <div className="flex items-baseline gap-2 sm:gap-4">
+            <board.Icon
+              className={cn('h-6 w-6 sm:h-10 sm:w-10', board.accent.text)}
+            />
             <h2
               key={mode}
               className={cn(
-                'text-[clamp(3rem,5vw,5.5rem)] font-black uppercase leading-none tracking-tight',
+                'text-[clamp(1.8rem,8vw,5.5rem)] font-black uppercase leading-none tracking-tight',
                 board.accent.text,
                 'animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)]',
               )}
             >
               {board.label}
             </h2>
-            <span className="ml-2 self-end pb-2 text-base uppercase tracking-[0.25em] text-white/40">
+            <span className="hidden self-end pb-1 text-[10px] uppercase tracking-[0.25em] text-white/40 sm:inline sm:pb-2 sm:text-base">
               by {board.metricLabel}
             </span>
           </div>
 
           {/* Window switcher */}
-          <div className="inline-flex rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/10">
+          <div className="inline-flex w-full rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/10 md:w-auto">
             {WINDOWS.map((w) => (
               <button
                 key={w.key}
                 type="button"
                 onClick={() => setWin(w.key)}
                 className={cn(
-                  'rounded-lg px-5 py-2 text-sm font-bold uppercase tracking-wider transition',
+                  'flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition sm:px-5 sm:text-sm md:flex-initial',
                   win === w.key
                     ? 'bg-white text-black shadow-lg'
                     : 'text-white/60 hover:text-white',
@@ -274,7 +278,7 @@ export function LeaderboardTv() {
         </div>
 
         {/* Window sub-label */}
-        <p className="mt-2 text-sm uppercase tracking-[0.2em] text-white/40">
+        <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/40 sm:text-sm">
           {windowMeta.sub}
         </p>
 
@@ -328,7 +332,7 @@ export function LeaderboardTv() {
         </main>
 
         {/* ── Footer ───────────────────────────────────────────── */}
-        <footer className="mt-6 flex items-center justify-between border-t border-white/10 pt-5 text-[11px] uppercase tracking-[0.2em] text-white/50">
+        <footer className="mt-4 flex flex-col items-start gap-3 border-t border-white/10 pt-4 text-[10px] uppercase tracking-[0.2em] text-white/50 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]">
           <div className="flex items-center gap-3">
             <span className="relative inline-flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -341,7 +345,8 @@ export function LeaderboardTv() {
           <div className="flex items-center gap-3">
             <Dot active={mode === 'pick'} accent={BOARDS.pick.accent.bar} />
             <Dot active={mode === 'pack'} accent={BOARDS.pack.accent.bar} />
-            <span className="ml-2">Cycles every {CYCLE_MS / 1000}s</span>
+            <span className="ml-2 hidden sm:inline">Cycles every {CYCLE_MS / 1000}s</span>
+            <span className="ml-2 sm:hidden">{CYCLE_MS / 1000}s cycle</span>
           </div>
         </footer>
       </div>
@@ -373,24 +378,127 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 function Podium({ top, board }: { top: LeaderboardRow[]; board: BoardConfig }) {
-  // Render order: #2 (left), #1 (centre), #3 (right). Tallest in the middle.
-  const slots = [
-    { row: top[1], rank: 2, h: 'h-[24vh]' },
-    { row: top[0], rank: 1, h: 'h-[32vh]' },
-    { row: top[2], rank: 3, h: 'h-[20vh]' },
-  ]
+  // On md+, classic 3-column podium with #1 in the centre.
+  // On mobile, stack: #1 hero card at top, #2 + #3 side-by-side beneath.
   return (
-    <div className="grid grid-cols-3 items-end gap-6 xl:gap-10">
-      {slots.map((s, i) => (
-        <PodiumColumn
-          key={i}
-          row={s.row}
-          rank={s.rank}
-          height={s.h}
-          board={board}
-          delayMs={i === 1 ? 0 : i === 0 ? 140 : 280}
-        />
-      ))}
+    <>
+      {/* Mobile / small screens — stacked layout */}
+      <div className="flex flex-col gap-3 md:hidden">
+        <MobilePodiumHero row={top[0]} board={board} />
+        {(top[1] || top[2]) && (
+          <div className="grid grid-cols-2 gap-3">
+            <MobilePodiumCard row={top[1]} rank={2} board={board} delayMs={140} />
+            <MobilePodiumCard row={top[2]} rank={3} board={board} delayMs={220} />
+          </div>
+        )}
+      </div>
+
+      {/* Desktop / TV — classic podium pillars */}
+      <div className="hidden grid-cols-3 items-end gap-6 md:grid xl:gap-10">
+        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} delayMs={280} />
+      </div>
+    </>
+  )
+}
+
+function MobilePodiumHero({
+  row, board,
+}: { row: LeaderboardRow | undefined; board: BoardConfig }) {
+  if (!row) {
+    return (
+      <div className="rounded-2xl bg-white/[0.04] p-5 text-center ring-1 ring-white/10">
+        <p className="text-base font-bold text-white/40">No #1 yet</p>
+      </div>
+    )
+  }
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/15 via-white/10 to-white/5 p-5 ring-1 ring-white/10"
+      style={{ animation: 'podiumRise 600ms cubic-bezier(0.16,1,0.3,1) both' }}
+    >
+      <div className={cn('absolute inset-x-0 top-0 h-[3px]', board.accent.bar)} />
+      <div className="flex items-start justify-between gap-3">
+        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-400 px-3 text-xs font-black uppercase tracking-wider text-black shadow-lg">
+          <Crown className="h-3.5 w-3.5" />
+          #1
+        </span>
+        <div className="text-right">
+          <div
+            className={cn(
+              'tabular-nums text-[clamp(2.4rem,11vw,4rem)] font-black leading-none tracking-tight',
+              board.accent.text,
+            )}
+          >
+            {fmtN(row[board.metricKey] as number)}
+          </div>
+          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/40">
+            {board.metricLabel}
+          </div>
+        </div>
+      </div>
+      <p className="mt-4 text-[clamp(1.4rem,5.5vw,2rem)] font-bold uppercase leading-tight text-white">
+        {row.picker}
+      </p>
+      <div className="mt-1.5 text-xs uppercase tracking-wider text-white/50">
+        {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label} ·{' '}
+        {fmtN(row[board.secondaryB.key] as number)} {board.secondaryB.label}
+      </div>
+    </div>
+  )
+}
+
+function MobilePodiumCard({
+  row, rank, board, delayMs,
+}: {
+  row: LeaderboardRow | undefined
+  rank: number
+  board: BoardConfig
+  delayMs: number
+}) {
+  const medal: Record<number, string> = {
+    2: 'bg-slate-300 text-black',
+    3: 'bg-amber-700 text-white',
+  }
+  return (
+    <div
+      className="rounded-2xl bg-white/[0.04] p-3.5 ring-1 ring-white/10"
+      style={{
+        animation: `podiumRise 600ms ${delayMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            'inline-flex h-7 items-center rounded-full px-2.5 text-[11px] font-black uppercase tracking-wider',
+            row ? medal[rank] : 'bg-white/10 text-white/30',
+          )}
+        >
+          #{rank}
+        </span>
+        <span
+          className={cn(
+            'tabular-nums text-2xl font-black leading-none tracking-tight',
+            row ? board.accent.text : 'text-white/30',
+          )}
+        >
+          {row ? fmtN(row[board.metricKey] as number) : '—'}
+        </span>
+      </div>
+      <p
+        className={cn(
+          'mt-2 truncate text-base font-bold uppercase leading-tight',
+          row ? 'text-white' : 'text-white/40',
+        )}
+      >
+        {row?.picker ?? '—'}
+      </p>
+      {row && (
+        <div className="mt-0.5 truncate text-[10px] uppercase tracking-wider text-white/40">
+          {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label}
+        </div>
+      )}
     </div>
   )
 }
@@ -497,17 +605,19 @@ function RestRow({
 }) {
   return (
     <li
-      className="flex items-center gap-5 rounded-lg bg-white/[0.04] px-5 py-3 ring-1 ring-white/10"
+      className="flex items-center gap-3 rounded-lg bg-white/[0.04] px-3 py-2.5 ring-1 ring-white/10 sm:gap-5 sm:px-5 sm:py-3"
       style={{
         animation: `restSlide 450ms ${(rank - 4) * 60}ms cubic-bezier(0.16,1,0.3,1) both`,
       }}
     >
-      <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-md bg-white/5 font-mono text-base font-bold text-white/60">
+      <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md bg-white/5 font-mono text-sm font-bold text-white/60 sm:h-10 sm:w-10 sm:text-base">
         {rank}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xl font-bold text-white xl:text-2xl">{row.picker}</div>
-        <div className="mt-0.5 text-xs uppercase tracking-wider text-white/40">
+        <div className="truncate text-base font-bold text-white sm:text-xl xl:text-2xl">
+          {row.picker}
+        </div>
+        <div className="mt-0.5 truncate text-[10px] uppercase tracking-wider text-white/40 sm:text-xs">
           {fmtN(row[board.secondaryA.key] as number)} {board.secondaryA.label} ·{' '}
           {fmtN(row[board.secondaryB.key] as number)} {board.secondaryB.label}
         </div>
@@ -515,7 +625,7 @@ function RestRow({
       <div className="text-right">
         <span
           className={cn(
-            'tabular-nums text-3xl font-black xl:text-4xl tracking-tight',
+            'tabular-nums text-xl font-black tracking-tight sm:text-3xl xl:text-4xl',
             board.accent.text,
           )}
         >
