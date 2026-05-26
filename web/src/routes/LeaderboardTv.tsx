@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Trophy, Package, PackageCheck, X, Crown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/cn'
@@ -65,6 +65,18 @@ const WINDOWS: { key: LeaderboardWindow; label: string; sub: string }[] = [
   { key: 'month', label: 'Month to date', sub: 'This month' },
 ]
 
+// Adelaide-local formatters cached at module scope. Rebuilding these
+// every render on a 1Hz clock tick is the single biggest waste in the
+// old layout — formatToParts() over a fresh Intl.DateTimeFormat is
+// surprisingly expensive when it runs across the whole render tree.
+const ADL_TZ = 'Australia/Adelaide'
+const TIME_FMT = new Intl.DateTimeFormat('en-AU', {
+  timeZone: ADL_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+})
+const DATE_FMT = new Intl.DateTimeFormat('en-AU', {
+  timeZone: ADL_TZ, weekday: 'long', day: 'numeric', month: 'long',
+})
+
 // Metallic gradients for podium pillars + score text. Each metal has a
 // fully-saturated "edge" pair and a hot highlight near 50% that the
 // shimmer animation slides through.
@@ -129,20 +141,23 @@ export function LeaderboardTv() {
     latest: null,
   })
   const [err, setErr] = useState<string | null>(null)
-  const [, setTick] = useState(0)
   const [orders, setOrders] = useState<OrdersProgress | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    let ctl: AbortController | null = null
+    let intervalId: number | null = null
+
     const load = () => {
-      const ctl = new AbortController()
-      fetchOrdersProgress(ctl.signal)
+      const c = new AbortController()
+      ctl = c
+      fetchOrdersProgress(c.signal)
         .then((o) => { if (!cancelled) setOrders(o) })
         .catch(() => undefined)
       Promise.all([
-        fetchLeaderboard('today', ctl.signal).catch(() => null),
-        fetchLeaderboard('week', ctl.signal).catch(() => null),
-        fetchLeaderboard('month', ctl.signal).catch(() => null),
+        fetchLeaderboard('today', c.signal).catch(() => null),
+        fetchLeaderboard('week', c.signal).catch(() => null),
+        fetchLeaderboard('month', c.signal).catch(() => null),
       ]).then(([t, w, m]) => {
         if (cancelled) return
         const latest = [t, w, m]
@@ -164,23 +179,57 @@ export function LeaderboardTv() {
         if (cancelled || e.name === 'AbortError') return
         setErr(e.message)
       })
-      return ctl
     }
-    let ctl = load()
-    const id = setInterval(() => { ctl.abort(); ctl = load() }, REFRESH_MS)
-    return () => { cancelled = true; clearInterval(id); ctl.abort() }
+
+    const start = () => {
+      if (intervalId !== null) return
+      load()
+      intervalId = window.setInterval(() => { ctl?.abort(); load() }, REFRESH_MS)
+    }
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+      ctl?.abort()
+    }
+
+    if (!document.hidden) start()
+
+    const onVisibility = () => {
+      if (document.hidden) stop()
+      else start()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      cancelled = true
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setMode((m) => (m === 'pick' ? 'pack' : 'pick'))
-    }, CYCLE_MS)
-    return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1_000)
-    return () => clearInterval(id)
+    let intervalId: number | null = null
+    const start = () => {
+      if (intervalId !== null) return
+      intervalId = window.setInterval(() => {
+        setMode((m) => (m === 'pick' ? 'pack' : 'pick'))
+      }, CYCLE_MS)
+    }
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+    if (!document.hidden) start()
+    const onVisibility = () => (document.hidden ? stop() : start())
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   useEffect(() => {
@@ -258,17 +307,6 @@ export function LeaderboardTv() {
     prevWinnerByKey.current[key] = current
   }, [ranked, mode, win])
 
-  const now = new Date()
-  // Lock the displayed time/date to the warehouse timezone (Adelaide)
-  // so the TV reads the same no matter where the browser is.
-  const tz = 'Australia/Adelaide'
-  const timeStr = now.toLocaleTimeString('en-AU', {
-    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
-  })
-  const dateStr = now.toLocaleDateString('en-AU', {
-    timeZone: tz, weekday: 'long', day: 'numeric', month: 'long',
-  })
-
   // Theme-aware tokens — defined once so the JSX stays readable
   const t = {
     bg:           isLight ? 'bg-[#f4f6fa]' : 'bg-[#070a13]',
@@ -330,14 +368,7 @@ export function LeaderboardTv() {
               </h1>
             </div>
           </div>
-          <div className="flex items-end justify-between gap-3 md:flex-col md:items-end md:text-right">
-            <div className="font-mono text-[clamp(2rem,9vw,4.5rem)] font-bold leading-none tabular-nums tracking-tight">
-              {timeStr}
-            </div>
-            <p className={cn('text-[10px] uppercase tracking-[0.2em] sm:text-xs', t.textMuted)}>
-              {dateStr}
-            </p>
-          </div>
+          <LiveClock textMuted={t.textMuted} />
         </header>
 
         {/* ── Toolbar: category + window switcher ─────────────────── */}
@@ -531,6 +562,40 @@ export function LeaderboardTv() {
 }
 
 // ─── Sub-components ─────────────────────────────────────────────────────
+
+// Self-contained clock — owns its own tick state so the 1Hz update
+// only re-renders this tiny subtree, not the whole leaderboard. Big
+// freeze-prevention win on long-running TV sessions.
+const LiveClock = memo(function LiveClock({ textMuted }: { textMuted: string }) {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    // Align ticks to the start of the next second so the digit changes
+    // line up with wall-clock seconds.
+    const drift = 1000 - (Date.now() % 1000)
+    let intervalId: number | null = null
+    const startInterval = () => {
+      intervalId = window.setInterval(() => setNow(new Date()), 1000)
+    }
+    const timeoutId = window.setTimeout(() => {
+      setNow(new Date())
+      startInterval()
+    }, drift)
+    return () => {
+      clearTimeout(timeoutId)
+      if (intervalId !== null) clearInterval(intervalId)
+    }
+  }, [])
+  return (
+    <div className="flex items-end justify-between gap-3 md:flex-col md:items-end md:text-right">
+      <div className="font-mono text-[clamp(2rem,9vw,4.5rem)] font-bold leading-none tabular-nums tracking-tight">
+        {TIME_FMT.format(now)}
+      </div>
+      <p className={cn('text-[10px] uppercase tracking-[0.2em] sm:text-xs', textMuted)}>
+        {DATE_FMT.format(now)}
+      </p>
+    </div>
+  )
+})
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -892,19 +957,34 @@ const CONFETTI_COLORS = [
 ]
 
 function Confetti({ trigger }: { trigger: number }) {
-  if (trigger === 0) return null
-  // 70 pieces is enough to feel celebratory without tanking GPU.
-  const pieces = Array.from({ length: 70 }, (_, i) => ({
-    left: Math.random() * 100,
-    delay: Math.random() * 0.4,
-    duration: 2.6 + Math.random() * 1.4,
-    wobble: (Math.random() - 0.5) * 280,
-    spin: (Math.random() * 4 + 2) * 360,
-    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-  }))
+  // Mount on trigger, auto-unmount once the longest piece has finished
+  // animating. Stops 70 invisible spans piling up in the DOM after each
+  // celebration on a long-running TV session.
+  const [active, setActive] = useState(false)
+  useEffect(() => {
+    if (trigger === 0) return
+    setActive(true)
+    // Longest possible run: 0.4s delay + 4s duration ≈ 4.4s, give it slack.
+    const id = window.setTimeout(() => setActive(false), 5000)
+    return () => clearTimeout(id)
+  }, [trigger])
+  // Memoise the piece config so re-renders triggered by parent state
+  // don't reshuffle a celebration mid-flight.
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 70 }, (_, i) => ({
+        left: Math.random() * 100,
+        delay: Math.random() * 0.4,
+        duration: 2.6 + Math.random() * 1.4,
+        wobble: (Math.random() - 0.5) * 280,
+        spin: (Math.random() * 4 + 2) * 360,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      })),
+    [trigger],
+  )
+  if (!active) return null
   return (
     <div
-      key={trigger}
       className="pointer-events-none fixed inset-0 z-40 overflow-hidden"
       aria-hidden
     >
