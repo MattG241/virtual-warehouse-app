@@ -1008,7 +1008,7 @@ function BadgeLegend({
       >
         Earn
       </span>
-      <ul className="grid flex-1 grid-cols-3 gap-x-2 gap-y-1.5 sm:grid-cols-6 sm:gap-x-4">
+      <ul className="grid flex-1 grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-6 sm:gap-x-4">
         {LEGEND_ORDER.map((key) => {
           const meta = BADGES[key]
           return (
@@ -1016,13 +1016,13 @@ function BadgeLegend({
               <img
                 src={meta.imageUrl}
                 alt={meta.label}
-                className="h-8 w-8 flex-shrink-0 sm:h-10 sm:w-10"
+                className="h-9 w-9 flex-shrink-0 sm:h-10 sm:w-10"
                 draggable={false}
               />
-              <div className="min-w-0">
+              <div className="min-w-0 leading-tight">
                 <div
                   className={cn(
-                    'truncate text-[11px] font-bold uppercase tracking-wider sm:text-sm',
+                    'text-[11px] font-bold uppercase tracking-wider sm:text-sm sm:truncate',
                     isLight ? 'text-slate-900' : 'text-white',
                   )}
                 >
@@ -1030,7 +1030,7 @@ function BadgeLegend({
                 </div>
                 <div
                   className={cn(
-                    'truncate text-[10px] sm:text-xs',
+                    'text-[10px] sm:text-xs sm:truncate',
                     isLight ? 'text-slate-500' : 'text-white/50',
                   )}
                 >
@@ -1244,11 +1244,11 @@ function NewsTicker({
         </span>
         Live
       </span>
-      <div className="relative h-6 min-w-0 flex-1 overflow-hidden sm:h-7">
+      <div className="relative min-w-0 flex-1">
         <div
           key={safeIdx}
           className={cn(
-            'absolute inset-0 flex items-center truncate text-sm font-semibold sm:text-base',
+            'text-[13px] font-semibold leading-snug sm:truncate sm:text-base sm:leading-normal',
             isLight ? 'text-slate-700' : 'text-white/80',
           )}
           style={{ animation: 'tickerSlide 500ms cubic-bezier(0.16,1,0.3,1) both' }}
