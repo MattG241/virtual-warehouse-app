@@ -146,7 +146,6 @@ export function LeaderboardTv() {
   useEffect(() => {
     let cancelled = false
     let ctl: AbortController | null = null
-    let intervalId: number | null = null
 
     const load = () => {
       const c = new AbortController()
@@ -181,54 +180,51 @@ export function LeaderboardTv() {
       })
     }
 
-    const start = () => {
-      if (intervalId !== null) return
-      load()
-      intervalId = window.setInterval(() => { ctl?.abort(); load() }, REFRESH_MS)
-    }
-    const stop = () => {
-      if (intervalId !== null) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-      ctl?.abort()
-    }
-
-    if (!document.hidden) start()
-
-    const onVisibility = () => {
-      if (document.hidden) stop()
-      else start()
-    }
-    document.addEventListener('visibilitychange', onVisibility)
+    // Always run — visibility-pause was breaking the TV mirror case
+    // (when the source PC backgrounds the tab, document.hidden=true even
+    // though the screen is still being cast and people are watching it).
+    // Chrome will still throttle background tabs internally, but at least
+    // our own code doesn't double-down on the pause.
+    load()
+    const intervalId = window.setInterval(() => { ctl?.abort(); load() }, REFRESH_MS)
 
     return () => {
       cancelled = true
-      stop()
-      document.removeEventListener('visibilitychange', onVisibility)
+      clearInterval(intervalId)
+      ctl?.abort()
     }
   }, [])
 
   useEffect(() => {
-    let intervalId: number | null = null
-    const start = () => {
-      if (intervalId !== null) return
-      intervalId = window.setInterval(() => {
-        setMode((m) => (m === 'pick' ? 'pack' : 'pick'))
-      }, CYCLE_MS)
+    const id = window.setInterval(() => {
+      setMode((m) => (m === 'pick' ? 'pack' : 'pick'))
+    }, CYCLE_MS)
+    return () => clearInterval(id)
+  }, [])
+
+  // Best-effort wake-lock so the source PC doesn't sleep / blank the
+  // mirror mid-shift. Not all browsers expose this (especially older
+  // ones), so we wrap it in a try/catch and quietly give up.
+  useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> }
     }
-    const stop = () => {
-      if (intervalId !== null) {
-        clearInterval(intervalId)
-        intervalId = null
+    const acquire = async () => {
+      try {
+        if (nav.wakeLock?.request) lock = await nav.wakeLock.request('screen')
+      } catch {
+        /* permission denied / not supported — fine */
       }
     }
-    if (!document.hidden) start()
-    const onVisibility = () => (document.hidden ? stop() : start())
-    document.addEventListener('visibilitychange', onVisibility)
+    acquire()
+    // Re-acquire on tab focus — wake locks drop when the tab loses
+    // visibility (per spec) and the lock then needs to be re-requested.
+    const onVis = () => { if (!document.hidden) acquire() }
+    document.addEventListener('visibilitychange', onVis)
     return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('visibilitychange', onVis)
+      lock?.release().catch(() => undefined)
     }
   }, [])
 
