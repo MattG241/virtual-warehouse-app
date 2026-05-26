@@ -377,26 +377,23 @@ export async function runOrderSnapshot() {
 
   try {
     const pvx = new PvxClient(config.pvx);
-    let openCount = 0;
-    let header = null;
-
-    for await (const event of pvx.iterateAllRows({
+    // We only need the total count of open orders, not the row data.
+    // PVX's `Outstanding sales orders` template returns an empty body
+    // when paged at the standard 1000-row size, so request a tiny page
+    // and read totalCount from PVX's response header.
+    await pvx.ensureSession();
+    const { totalCount, csv } = await pvx.getReportPage({
       template,
       columns: config.pvx.openOrdersColumns,
-      pageSize: config.sync.pageSize,
-      pageDelayMs: config.sync.pageDelayMs,
-    })) {
-      if (event.header) {
-        header = event.header;
-        continue;
-      }
-      if (event.row) openCount += 1;
-    }
+      pageNo: 1,
+      pageSize: 10,
+    });
 
-    if (!header) {
-      console.log('[order-snap] no header returned — skipping');
-      return { skipped: 'no header' };
+    if (csv.length === 0 && totalCount === 0) {
+      console.log('[order-snap] empty response — skipping');
+      return { skipped: 'no data' };
     }
+    const openCount = totalCount;
 
     // Update current-open singleton.
     await pool.query(
