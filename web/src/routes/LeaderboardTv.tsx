@@ -260,7 +260,7 @@ export function LeaderboardTv() {
   }
 
   return (
-    <div className={cn('fixed inset-0 z-50 overflow-y-auto overflow-x-hidden transition-colors duration-500', t.bg, t.text)}>
+    <div className={cn('fixed inset-0 z-50 overflow-hidden transition-colors duration-500', t.bg, t.text)}>
       {/* Soft ambient spotlight in the active board's accent colour */}
       <div
         className="pointer-events-none absolute inset-0 transition-[background] duration-700"
@@ -285,9 +285,9 @@ export function LeaderboardTv() {
         <X className="h-4 w-4 sm:h-5 sm:w-5" />
       </button>
 
-      <div className="relative z-10 flex h-full flex-col p-4 sm:p-6 xl:p-12">
+      <div className="relative z-10 flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6 xl:p-8">
         {/* ── Header ───────────────────────────────────────────────── */}
-        <header className={cn('flex flex-col gap-4 border-b pb-4 sm:pb-6 md:flex-row md:items-center md:justify-between', t.border)}>
+        <header className={cn('flex flex-shrink-0 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between', t.border)}>
           <div className="flex items-center gap-3 sm:gap-5">
             <div className={cn('grid h-10 w-10 place-items-center rounded-xl ring-1 sm:h-14 sm:w-14', t.iconBg, t.iconRing)}>
               <Trophy className={cn('h-5 w-5 sm:h-7 sm:w-7', t.textMuted)} />
@@ -312,23 +312,23 @@ export function LeaderboardTv() {
         </header>
 
         {/* ── Toolbar: category + window switcher ─────────────────── */}
-        <div className="mt-4 flex flex-col gap-3 sm:mt-6 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
+        <div className="flex flex-shrink-0 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
           <div className="flex items-baseline gap-2 sm:gap-4">
             <board.Icon
-              className={cn('h-6 w-6 sm:h-10 sm:w-10', isLight ? board.accent.light : board.accent.dark)}
+              className={cn('h-6 w-6 sm:h-9 sm:w-9', isLight ? board.accent.light : board.accent.dark)}
             />
             <h2
               key={mode}
               className={cn(
-                'text-[clamp(1.8rem,8vw,5.5rem)] font-black uppercase leading-none tracking-tight',
+                'text-[clamp(1.6rem,6.5vw,4.5rem)] font-black uppercase leading-none tracking-tight',
                 isLight ? board.accent.light : board.accent.dark,
                 'animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)]',
               )}
             >
               {board.label}
             </h2>
-            <span className={cn('hidden self-end pb-1 text-[10px] uppercase tracking-[0.25em] sm:inline sm:pb-2 sm:text-base', t.textSubtle)}>
-              by {board.metricLabel}
+            <span className={cn('hidden self-end pb-1 text-[10px] uppercase tracking-[0.25em] sm:inline sm:text-sm', t.textSubtle)}>
+              by {board.metricLabel} · {windowMeta.label}
             </span>
           </div>
 
@@ -339,7 +339,7 @@ export function LeaderboardTv() {
                 type="button"
                 onClick={() => setWin(w.key)}
                 className={cn(
-                  'flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition sm:px-5 sm:text-sm md:flex-initial',
+                  'flex-1 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition sm:px-5 sm:text-sm md:flex-initial',
                   win === w.key ? t.pillActive + ' shadow-lg' : t.pillIdle,
                 )}
               >
@@ -349,17 +349,13 @@ export function LeaderboardTv() {
           </div>
         </div>
 
-        <p className={cn('mt-2 text-[10px] uppercase tracking-[0.2em] sm:text-sm', t.textSubtle)}>
-          {windowMeta.sub}
-        </p>
-
         {/* ── Morning-backlog progress bar ────────────────────────── */}
         {orders?.configured && orders.baseline && (
           <OrdersProgressBar orders={orders} isLight={isLight} />
         )}
 
         {/* ── Main ─────────────────────────────────────────────────── */}
-        <main className="mt-6 flex flex-1 flex-col gap-6">
+        <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           {err ? (
             <Centered>
               <p className={cn('text-2xl', t.textMuted)}>{err}</p>
@@ -392,7 +388,7 @@ export function LeaderboardTv() {
             <>
               <Podium top={topThree} board={board} isLight={isLight} win={win} key={`${mode}-${win}-podium`} />
               {rest.length > 0 && (
-                <ol className="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-3">
+                <ol className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-hidden xl:grid-cols-2 xl:gap-3">
                   {rest.map((r, i) => (
                     <RestRow
                       key={`${mode}-${win}-${r.picker}`}
@@ -418,7 +414,7 @@ export function LeaderboardTv() {
         <BadgeLegend isLight={isLight} borderClass={t.border} />
 
         {/* ── Footer ───────────────────────────────────────────────── */}
-        <footer className={cn('mt-4 flex flex-col items-start gap-3 border-t pt-4 text-[10px] uppercase tracking-[0.2em] sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]', t.border, t.textMuted)}>
+        <footer className={cn('flex flex-shrink-0 flex-col items-start gap-2 border-t pt-2 text-[10px] uppercase tracking-[0.2em] sm:flex-row sm:items-center sm:justify-between sm:text-[11px]', t.border, t.textMuted)}>
           <div className="flex items-center gap-3">
             <span className="relative inline-flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -535,10 +531,10 @@ function Podium({
       </div>
 
       {/* Desktop / TV — classic 3-pillar podium */}
-      <div className="hidden grid-cols-3 items-end gap-6 md:grid xl:gap-10">
-        <PodiumColumn row={top[1]} rank={2} height="h-[24vh]" board={board} isLight={isLight} win={win} delayMs={140} />
-        <PodiumColumn row={top[0]} rank={1} height="h-[32vh]" board={board} isLight={isLight} win={win} delayMs={0} />
-        <PodiumColumn row={top[2]} rank={3} height="h-[20vh]" board={board} isLight={isLight} win={win} delayMs={280} />
+      <div className="hidden flex-shrink-0 grid-cols-3 items-end gap-6 md:grid xl:gap-10">
+        <PodiumColumn row={top[1]} rank={2} height="h-[16vh]" board={board} isLight={isLight} win={win} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[22vh]" board={board} isLight={isLight} win={win} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[13vh]" board={board} isLight={isLight} win={win} delayMs={280} />
       </div>
     </>
   )
@@ -999,7 +995,7 @@ function BadgeLegend({
   return (
     <section
       className={cn(
-        'mt-4 flex items-center gap-3 border-t pt-3 sm:mt-5 sm:gap-4 sm:pt-4',
+        'flex flex-shrink-0 items-center gap-3 border-t pt-2 sm:gap-4',
         borderClass,
       )}
       aria-label="Badge legend"
@@ -1012,15 +1008,15 @@ function BadgeLegend({
       >
         Earn
       </span>
-      <ul className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2 sm:grid-cols-6 sm:gap-x-4">
+      <ul className="grid flex-1 grid-cols-3 gap-x-2 gap-y-1.5 sm:grid-cols-6 sm:gap-x-4">
         {LEGEND_ORDER.map((key) => {
           const meta = BADGES[key]
           return (
-            <li key={key} className="flex items-center gap-2.5 sm:gap-3">
+            <li key={key} className="flex items-center gap-2 sm:gap-2.5">
               <img
                 src={meta.imageUrl}
                 alt={meta.label}
-                className="h-9 w-9 flex-shrink-0 sm:h-11 sm:w-11"
+                className="h-8 w-8 flex-shrink-0 sm:h-10 sm:w-10"
                 draggable={false}
               />
               <div className="min-w-0">
@@ -1060,10 +1056,21 @@ function OrdersProgressBar({
   if (!orders.baseline) return null
   const pct = orders.percent
   const goalReached = pct >= 100
+  const newArrivals =
+    orders.currentOpen != null
+      ? Math.max(0, orders.currentOpen - orders.baseline.count)
+      : 0
+  // Honest capture-time label — show the actual local time the
+  // baseline locked, not a generic "8am" claim that may be wrong if
+  // we re-captured mid-day or at the 4pm reset.
+  const capturedLocal = new Date(orders.baseline.capturedAt).toLocaleTimeString(
+    'en-AU',
+    { timeZone: 'Australia/Adelaide', hour: '2-digit', minute: '2-digit', hour12: false },
+  )
   return (
     <section
       className={cn(
-        'mt-4 rounded-xl px-4 py-3 ring-1 sm:mt-5 sm:px-5 sm:py-4',
+        'rounded-xl px-4 py-2.5 ring-1 sm:px-5 sm:py-3',
         isLight ? 'bg-white/70 ring-slate-200' : 'bg-white/[0.04] ring-white/10',
       )}
     >
@@ -1075,7 +1082,7 @@ function OrdersProgressBar({
               isLight ? 'text-slate-500' : 'text-white/40',
             )}
           >
-            Morning workload
+            Workload
           </p>
           <p
             className={cn(
@@ -1083,7 +1090,7 @@ function OrdersProgressBar({
               isLight ? 'text-slate-400' : 'text-white/40',
             )}
           >
-            {orders.baseline.count} open at 8am
+            {orders.baseline.count} open at {capturedLocal}
           </p>
         </div>
         <div className="flex items-baseline gap-3 font-mono">
@@ -1109,7 +1116,7 @@ function OrdersProgressBar({
       </div>
       <div
         className={cn(
-          'mt-2.5 h-3 overflow-hidden rounded-full sm:h-3.5',
+          'mt-2 h-3 overflow-hidden rounded-full sm:h-3.5',
           isLight ? 'bg-slate-200' : 'bg-white/10',
         )}
       >
@@ -1126,15 +1133,20 @@ function OrdersProgressBar({
       {orders.currentOpen != null && (
         <p
           className={cn(
-            'mt-2 text-[10px] uppercase tracking-[0.18em] sm:text-xs',
+            'mt-1.5 text-[10px] uppercase tracking-[0.18em] sm:text-xs',
             isLight ? 'text-slate-400' : 'text-white/35',
           )}
         >
-          {goalReached
-            ? '🎉 Morning backlog cleared'
-            : `${orders.currentOpen} still open`}
-          {' · '}team shipped {orders.despatchedToday} order despatches today
-          {' · '}baseline captured {agoLabel(orders.baseline.capturedAt)}
+          {goalReached ? '🎉 Workload cleared' : `${orders.currentOpen} still open`}
+          {newArrivals > 0 && (
+            <>
+              {' · '}
+              <span className={cn('font-semibold', isLight ? 'text-amber-700' : 'text-amber-300')}>
+                +{newArrivals} new since baseline
+              </span>
+            </>
+          )}
+          {' · '}team shipped {orders.despatchedToday} today
         </p>
       )}
     </section>
@@ -1217,7 +1229,7 @@ function NewsTicker({
   const safeIdx = idx % items.length
 
   return (
-    <div className={cn('mt-4 flex items-center gap-3 border-t pt-3 sm:mt-6 sm:gap-4 sm:pt-4', borderClass)}>
+    <div className={cn('flex flex-shrink-0 items-center gap-3 border-t pt-2 sm:gap-4', borderClass)}>
       <span
         className={cn(
           'inline-flex h-6 flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-black uppercase tracking-[0.18em] ring-1',
