@@ -199,10 +199,20 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
   }
 });
 
-app.post('/api/picks/sync-now', express.json(), async (_req, res) => {
+app.post('/api/picks/sync-now', express.json(), async (req, res) => {
+  // Accept overrides from either query or JSON body — handy for ad-hoc
+  // runs against alternate templates.
+  const template =
+    (req.query.template ? String(req.query.template) : null) ||
+    (req.body && req.body.template) ||
+    undefined;
+  const columns =
+    (req.query.columns ? String(req.query.columns) : null) ||
+    (req.body && req.body.columns) ||
+    undefined;
   try {
-    const result = await runPickSync();
-    res.json({ ok: true, ...result });
+    const result = await runPickSync({ template, columns });
+    res.json({ ok: true, template: template || null, ...result });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
@@ -212,6 +222,41 @@ app.get('/api/leaderboard', async (req, res) => {
   const allowed = new Set(['today', 'week', 'month']);
   const windowKey = allowed.has(String(req.query.window)) ? req.query.window : 'today';
   const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  const mode = String(req.query.mode || 'diff');
+
+  // Raw mode: return the latest snapshot per picker verbatim. Useful when
+  // the PVX template already has the right time filter baked in (e.g.
+  // "User activity - Today") so no diff is needed.
+  if (mode === 'raw') {
+    try {
+      const r = await pool.query(
+        `SELECT DISTINCT ON (picker)
+                picker,
+                items_picked       AS units,
+                picks_completed    AS lines,
+                orders_despatched  AS orders,
+                items_skipped, containers_moved, item_movements,
+                items_moved, packages_despatched, items_despatched,
+                snapshot_at
+           FROM pick_user_totals
+          ORDER BY picker, snapshot_at DESC`,
+      );
+      const sorted = r.rows.sort((a, b) => b.units - a.units).slice(0, limit);
+      res.set('Cache-Control', 'no-store');
+      res.json({
+        mode: 'raw',
+        configured: Boolean(config.pvx.pickTemplate),
+        rows: sorted,
+        totalRows: r.rows.length,
+        latest: r.rows.length ? r.rows[0].snapshot_at : null,
+      });
+      return;
+    } catch (e) {
+      console.error('[api/leaderboard raw] error:', e);
+      res.status(500).json({ error: e.message });
+      return;
+    }
+  }
 
   // PVX gives us cumulative totals — to get "activity within a window" we
   // diff the latest snapshot against the newest snapshot taken before the

@@ -213,13 +213,17 @@ const TOTAL_COLS = [
 ];
 
 let pickRunning = false;
-export async function runPickSync() {
-  if (!config.pvx.pickTemplate) return { skipped: 'PVX_PICK_TEMPLATE not set' };
+export async function runPickSync(opts = {}) {
+  // Optional per-call overrides so we can test alternate templates
+  // (e.g. "User activity - Today") without changing env vars.
+  const template = opts.template || config.pvx.pickTemplate;
+  const columns = opts.columns || config.pvx.pickColumns;
+  if (!template) return { skipped: 'PVX_PICK_TEMPLATE not set' };
   if (pickRunning) return { skipped: 'previous pick sync still running' };
   pickRunning = true;
 
   const startedAt = Date.now();
-  console.log(`[pick-sync] starting template="${config.pvx.pickTemplate}"`);
+  console.log(`[pick-sync] starting template="${template}"`);
 
   try {
     const pvx = new PvxClient(config.pvx);
@@ -227,8 +231,8 @@ export async function runPickSync() {
     let header = null;
 
     for await (const event of pvx.iterateAllRows({
-      template: config.pvx.pickTemplate,
-      columns: config.pvx.pickColumns,
+      template,
+      columns,
       pageSize: config.sync.pageSize,
       pageDelayMs: config.sync.pageDelayMs,
     })) {
