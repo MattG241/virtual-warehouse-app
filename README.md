@@ -94,6 +94,27 @@ Endpoints:
 - `GET /api/leaderboard?window=today|week|month&limit=20` — ranked list with all 9 metric columns. `configured` is false if no template is set for that window.
 - `POST /api/picks/sync-now` — kick off a one-off sync of every configured window. Accepts `?template=...&windowKey=...` overrides for ad-hoc testing.
 
+### Morning despatch progress bar (optional)
+
+On the warehouse TV (`/leaderboard`) we show a single progress bar of *"orders despatched today vs. orders outstanding at 8am"*. Off by default. To turn it on:
+
+1. **Create a PVX report** that returns one row per currently-open sales order — typically a copy of *Sales orders* filtered to e.g. "not yet despatched, due today or earlier". Save it as `Open sales orders` (or any name; you'll set it via env var).
+2. **Set Railway env vars**:
+
+   | Variable                    | Value                                                                                       |
+   | --------------------------- | ------------------------------------------------------------------------------------------- |
+   | `PVX_OPEN_ORDERS_TEMPLATE`  | Exact PVX template name. Empty = feature off.                                               |
+   | `PVX_OPEN_ORDERS_COLUMNS`   | Default `[Order Number]`. Any single column works — we count rows.                          |
+   | `WAREHOUSE_TZ`              | Default `Australia/Sydney`. Used to decide what "today" and "8am" mean.                     |
+   | `ORDER_BASELINE_HOUR`       | Default `8`. First sync at/after this local hour seeds the day's progress-bar denominator.  |
+
+3. Each sync the server pulls the template and stores the open-order count in `order_state`. The first sync after 8am (warehouse-local) inserts a row into `order_baselines` for that day — that becomes the day's denominator.
+
+Endpoints:
+
+- `GET /api/orders/progress` — `{ configured, baseline: { day, count, capturedAt }, currentOpen, despatchedToday, percent }`.
+- `POST /api/orders/sync-now` — manual snapshot, handy after configuring the env vars.
+
 If your PVX tenant uses different column headers, override `PVX_PICK_COLUMNS` and (if needed) `PVX_PICK_USER_COL`. The first sync logs the available headers if a required column is missing, so you can copy the exact names.
 
 ### Slack alerts (optional)

@@ -112,6 +112,7 @@ export async function runSyncOnce() {
     postAisleFullness(runId);
     // Pick activity sync is best-effort and isolated — never breaks inventory.
     runPickSync().catch((e) => console.error('[pick-sync] failed:', e.message));
+    runOrderSnapshot().catch((e) => console.error('[order-snap] failed:', e.message));
     return { runId, rowCount: finalRows.length };
   } catch (err) {
     console.error(`[sync] run #${runId} failed:`, err.message);
@@ -355,6 +356,94 @@ async function bulkInsertPickTotals(tx, rows, windowKey) {
       params,
     );
   }
+}
+
+// --- Open-orders snapshot -------------------------------------------------
+// Pulls a PVX report listing every currently-open sales order and stores
+// the row count in order_state. The first count captured after the
+// configured baseline hour (default 8am, warehouse tz) becomes the day's
+// progress-bar denominator in order_baselines. Opt-in via
+// PVX_OPEN_ORDERS_TEMPLATE — blank == feature off.
+
+let orderSnapRunning = false
+export async function runOrderSnapshot() {
+  const template = config.pvx.openOrdersTemplate;
+  if (!template) return { skipped: 'PVX_OPEN_ORDERS_TEMPLATE not set' };
+  if (orderSnapRunning) return { skipped: 'previous order snapshot still running' };
+  orderSnapRunning = true;
+
+  const startedAt = Date.now();
+  console.log(`[order-snap] starting template="${template}"`);
+
+  try {
+    const pvx = new PvxClient(config.pvx);
+    let openCount = 0;
+    let header = null;
+
+    for await (const event of pvx.iterateAllRows({
+      template,
+      columns: config.pvx.openOrdersColumns,
+      pageSize: config.sync.pageSize,
+      pageDelayMs: config.sync.pageDelayMs,
+    })) {
+      if (event.header) {
+        header = event.header;
+        continue;
+      }
+      if (event.row) openCount += 1;
+    }
+
+    if (!header) {
+      console.log('[order-snap] no header returned — skipping');
+      return { skipped: 'no header' };
+    }
+
+    // Update current-open singleton.
+    await pool.query(
+      `INSERT INTO order_state (id, open_count, updated_at)
+       VALUES (1, $1, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         open_count = EXCLUDED.open_count, updated_at = NOW()`,
+      [openCount],
+    );
+
+    // Capture today's baseline if we're past the threshold and don't have one.
+    const { date: localDate, hour: localHour } = warehouseDateParts();
+    if (localHour >= config.baselineHour) {
+      await pool.query(
+        `INSERT INTO order_baselines (day, baseline_count, captured_at)
+         VALUES ($1::date, $2, NOW())
+         ON CONFLICT (day) DO NOTHING`,
+        [localDate, openCount],
+      );
+    }
+
+    console.log(
+      `[order-snap] ok — ${openCount} open orders in ${Date.now() - startedAt}ms`,
+    );
+    publish('orders.snapshot', {
+      openCount,
+      finishedAt: new Date().toISOString(),
+    });
+    return { openCount };
+  } finally {
+    orderSnapRunning = false;
+  }
+}
+
+function warehouseDateParts() {
+  const fmt = new Intl.DateTimeFormat('en-AU', {
+    timeZone: config.warehouseTz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hour12: false,
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: parseInt(parts.hour, 10) || 0,
+  };
 }
 
 // CLI: node server/sync.js --once

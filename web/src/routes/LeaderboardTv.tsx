@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trophy, Package, PackageCheck, X, Crown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/cn'
-import { fetchLeaderboard, type LeaderboardRow, type LeaderboardWindow } from '@/lib/api'
+import {
+  fetchLeaderboard, fetchOrdersProgress,
+  type LeaderboardRow, type LeaderboardWindow, type OrdersProgress,
+} from '@/lib/api'
 import { useTheme } from '@/store/theme'
 
 // ─── Config ─────────────────────────────────────────────────────────────
@@ -126,11 +129,15 @@ export function LeaderboardTv() {
   })
   const [err, setErr] = useState<string | null>(null)
   const [, setTick] = useState(0)
+  const [orders, setOrders] = useState<OrdersProgress | null>(null)
 
   useEffect(() => {
     let cancelled = false
     const load = () => {
       const ctl = new AbortController()
+      fetchOrdersProgress(ctl.signal)
+        .then((o) => { if (!cancelled) setOrders(o) })
+        .catch(() => undefined)
       Promise.all([
         fetchLeaderboard('today', ctl.signal).catch(() => null),
         fetchLeaderboard('week', ctl.signal).catch(() => null),
@@ -337,6 +344,11 @@ export function LeaderboardTv() {
         <p className={cn('mt-2 text-[10px] uppercase tracking-[0.2em] sm:text-sm', t.textSubtle)}>
           {windowMeta.sub}
         </p>
+
+        {/* ── Morning-backlog progress bar ────────────────────────── */}
+        {orders?.configured && orders.baseline && (
+          <OrdersProgressBar orders={orders} isLight={isLight} />
+        )}
 
         {/* ── Main ─────────────────────────────────────────────────── */}
         <main className="mt-6 flex flex-1 flex-col gap-6">
@@ -857,6 +869,97 @@ function Dot({ active, accent }: { active: boolean; accent: string }) {
         active ? cn('w-8', accent) : 'w-2 bg-current opacity-20',
       )}
     />
+  )
+}
+
+// ─── Orders progress bar ───────────────────────────────────────────────
+
+function OrdersProgressBar({
+  orders, isLight,
+}: {
+  orders: OrdersProgress
+  isLight: boolean
+}) {
+  if (!orders.baseline) return null
+  const pct = orders.percent
+  const goalReached = pct >= 100
+  return (
+    <section
+      className={cn(
+        'mt-4 rounded-xl px-4 py-3 ring-1 sm:mt-5 sm:px-5 sm:py-4',
+        isLight ? 'bg-white/70 ring-slate-200' : 'bg-white/[0.04] ring-white/10',
+      )}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="flex items-baseline gap-2">
+          <p
+            className={cn(
+              'font-mono text-[10px] uppercase tracking-[0.24em] sm:text-[11px] sm:tracking-[0.32em]',
+              isLight ? 'text-slate-500' : 'text-white/40',
+            )}
+          >
+            Today's despatch progress
+          </p>
+          <p
+            className={cn(
+              'text-xs',
+              isLight ? 'text-slate-400' : 'text-white/40',
+            )}
+          >
+            {orders.baseline.count} morning orders
+          </p>
+        </div>
+        <div className="flex items-baseline gap-3 font-mono">
+          <span
+            className={cn(
+              'tabular-nums text-2xl font-black leading-none tracking-tight sm:text-3xl',
+              goalReached
+                ? isLight ? 'text-emerald-700' : 'text-emerald-300'
+                : isLight ? 'text-slate-900' : 'text-white',
+            )}
+          >
+            {pct.toFixed(0)}<span className="text-base font-bold">%</span>
+          </span>
+          <span
+            className={cn(
+              'tabular-nums text-base',
+              isLight ? 'text-slate-500' : 'text-white/60',
+            )}
+          >
+            {orders.despatchedToday} / {orders.baseline.count} despatched
+          </span>
+        </div>
+      </div>
+      <div
+        className={cn(
+          'mt-2.5 h-3 overflow-hidden rounded-full sm:h-3.5',
+          isLight ? 'bg-slate-200' : 'bg-white/10',
+        )}
+      >
+        <div
+          className={cn(
+            'h-full rounded-full transition-[width] duration-700 ease-out',
+            goalReached
+              ? 'bg-gradient-to-r from-emerald-400 via-emerald-300 to-emerald-500'
+              : 'bg-gradient-to-r from-cyan-400 via-cyan-300 to-emerald-300',
+          )}
+          style={{ width: `${Math.max(2, pct)}%` }}
+        />
+      </div>
+      {orders.currentOpen != null && (
+        <p
+          className={cn(
+            'mt-2 text-[10px] uppercase tracking-[0.18em] sm:text-xs',
+            isLight ? 'text-slate-400' : 'text-white/35',
+          )}
+        >
+          {goalReached
+            ? '🎉 Morning backlog cleared'
+            : `${orders.currentOpen} orders still open`}
+          {' · '}baseline captured {agoLabel(orders.baseline.capturedAt)}
+        </p>
+      )}
+    </section>
   )
 }
 

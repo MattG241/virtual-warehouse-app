@@ -92,5 +92,22 @@ export async function initSchema() {
 
     CREATE INDEX IF NOT EXISTS pick_user_totals_window_idx
       ON pick_user_totals(window_key, items_picked DESC);
+
+    -- Singleton row tracking the current count of outstanding sales
+    -- orders pulled from PVX (refreshed every sync if configured).
+    CREATE TABLE IF NOT EXISTS order_state (
+      id          INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      open_count  INTEGER NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    -- Per-day "morning backlog" snapshot — captured the first time a
+    -- sync runs after the configured baseline hour (default 8am local).
+    -- The progress bar uses (today's baseline) as its denominator.
+    CREATE TABLE IF NOT EXISTS order_baselines (
+      day             DATE PRIMARY KEY,
+      baseline_count  INTEGER NOT NULL,
+      captured_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 }

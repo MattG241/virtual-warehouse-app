@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { initSchema, pool } from './db.js';
-import { startSyncLoop, runSyncOnce, runPickSync } from './sync.js';
+import { startSyncLoop, runSyncOnce, runPickSync, runOrderSnapshot } from './sync.js';
 import { buildWarehouseData } from './shape.js';
 import { attachSseRoute, publish } from './events.js';
 import { attachExportRoutes } from './export.js';
@@ -196,6 +196,69 @@ app.post('/api/sync-now', express.json(), async (_req, res) => {
     res.json({ ok: true, ...result });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.post('/api/orders/sync-now', express.json(), async (_req, res) => {
+  try {
+    const result = await runOrderSnapshot();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/orders/progress', async (_req, res) => {
+  const configured = Boolean(config.pvx.openOrdersTemplate);
+  try {
+    // Current open count (singleton)
+    const stateRes = await pool.query(
+      `SELECT open_count, updated_at FROM order_state WHERE id = 1`,
+    );
+    const state = stateRes.rows[0] || null;
+
+    // Today's baseline (warehouse-local date)
+    const baselineRes = await pool.query(
+      `SELECT day, baseline_count, captured_at
+         FROM order_baselines
+        ORDER BY day DESC
+        LIMIT 1`,
+    );
+    const baseline = baselineRes.rows[0] || null;
+
+    // Today's despatched count = sum of orders_despatched across pickers
+    // in the Today snapshot. Falls back to baseline - current_open if
+    // pick data is missing.
+    const despatchRes = await pool.query(
+      `SELECT COALESCE(SUM(orders_despatched), 0)::int AS total
+         FROM pick_user_totals
+        WHERE window_key = 'today'`,
+    );
+    const despatchedFromPicks = despatchRes.rows[0]?.total || 0;
+    const despatchedFromDiff = baseline && state
+      ? Math.max(0, baseline.baseline_count - state.open_count)
+      : 0;
+    const despatched = Math.max(despatchedFromPicks, despatchedFromDiff);
+
+    const baselineCount = baseline?.baseline_count || 0;
+    const percent = baselineCount > 0
+      ? Math.min(100, Math.round((despatched / baselineCount) * 1000) / 10)
+      : 0;
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      configured,
+      baseline: baseline
+        ? { day: baseline.day, count: baseline.baseline_count, capturedAt: baseline.captured_at }
+        : null,
+      currentOpen: state?.open_count ?? null,
+      currentOpenAt: state?.updated_at ?? null,
+      despatchedToday: despatched,
+      percent,
+    });
+  } catch (e) {
+    console.error('[api/orders/progress] error:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 

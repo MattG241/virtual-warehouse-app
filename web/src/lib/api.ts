@@ -145,6 +145,27 @@ export interface LeaderboardResponse {
   latest: string | null
 }
 
+export interface OrdersProgress {
+  configured: boolean
+  baseline: { day: string; count: number; capturedAt: string } | null
+  currentOpen: number | null
+  currentOpenAt: string | null
+  despatchedToday: number
+  percent: number
+}
+
+/** Returns null if the backend has no orders/progress endpoint. */
+export async function fetchOrdersProgress(signal?: AbortSignal): Promise<OrdersProgress | null> {
+  const res = await fetch(`${BASE}/api/orders/progress`, {
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`/api/orders/progress ${res.status}`)
+  return res.json()
+}
+
 /** Returns null if the backend has no leaderboard endpoint (e.g. older deploys). */
 export async function fetchLeaderboard(
   win: LeaderboardWindow,

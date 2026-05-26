@@ -36,7 +36,17 @@ function loadConfig() {
         process.env.PVX_PICK_COLUMNS ||
         '[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]',
       pickUserCol: process.env.PVX_PICK_USER_COL || 'UserName',
+
+      // --- Outstanding orders snapshot (optional) ------------------------
+      // PVX template returning one row per currently-open sales order.
+      // Each sync counts the rows; the first count captured after 8am
+      // (local) becomes that day's progress-bar denominator.
+      openOrdersTemplate: process.env.PVX_OPEN_ORDERS_TEMPLATE || '',
+      openOrdersColumns:
+        process.env.PVX_OPEN_ORDERS_COLUMNS || '[Order Number]',
     },
+    warehouseTz: process.env.WAREHOUSE_TZ || 'Australia/Sydney',
+    baselineHour: Number(process.env.ORDER_BASELINE_HOUR || 8),
     sync: {
       intervalMs: Number(process.env.SYNC_INTERVAL_MS || 300000),
       pageSize: Number(process.env.SYNC_PAGE_SIZE || 1000),
