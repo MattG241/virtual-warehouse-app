@@ -568,16 +568,22 @@ function PodiumColumn({
         {/* Top edge highlight */}
         <div className={cn('absolute inset-x-0 top-0 h-[3px]', row ? 'bg-white/60' : 'bg-white/15')} />
 
-        {/* Big rank numeral cut into the pillar */}
+        {/* Big rank numeral burnished into the pillar. mix-blend-multiply
+            darkens the gold/silver/bronze underneath so the numeral reads
+            as engraved metal rather than flat dark text fighting the
+            glitter texture. The white text-shadow gives an embossed top
+            edge. */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className={cn(
               'select-none font-black leading-none tracking-tighter',
-              isWinner ? 'text-[14vh]' : rank === 2 ? 'text-[11vh]' : 'text-[9vh]',
+              isWinner ? 'text-[16vh]' : rank === 2 ? 'text-[12vh]' : 'text-[10vh]',
             )}
             style={{
-              color: 'rgba(0,0,0,0.22)',
-              textShadow: '0 2px 0 rgba(255,255,255,0.25)',
+              color: 'rgba(0,0,0,0.65)',
+              mixBlendMode: 'multiply',
+              textShadow:
+                '0 3px 0 rgba(255,255,255,0.45), 0 -1px 0 rgba(255,255,255,0.25)',
             }}
           >
             {rank}
