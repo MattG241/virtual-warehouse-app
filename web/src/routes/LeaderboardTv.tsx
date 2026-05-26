@@ -352,7 +352,7 @@ export function LeaderboardTv() {
         <X className="h-4 w-4 sm:h-5 sm:w-5" />
       </button>
 
-      <div className="relative z-10 flex min-h-screen flex-col gap-3 p-4 sm:gap-4 sm:p-6 md:h-full md:min-h-0 md:overflow-hidden xl:p-8">
+      <div className="relative z-10 flex min-h-[100dvh] flex-col gap-3 p-4 sm:gap-4 sm:p-6 md:h-full md:min-h-0 md:overflow-hidden xl:p-8">
         {/* ── Header ───────────────────────────────────────────────── */}
         <header className={cn('flex flex-shrink-0 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between', t.border)}>
           <div className="flex items-center gap-3 sm:gap-5">
