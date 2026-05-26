@@ -140,6 +140,7 @@ export class PvxClient {
     let pageNo = 1;
     let totalCount = Infinity;
     let yielded = 0;
+    let headerYielded = false;
 
     while (yielded < totalCount) {
       const { totalCount: tc, csv } = await this.getReportPage({
@@ -150,9 +151,14 @@ export class PvxClient {
       });
       totalCount = tc;
       const rows = parseCsv(csv);
-      if (rows.length <= 1) break; // header only, no data
+      if (rows.length === 0) break; // truly empty response
       const [header, ...data] = rows;
-      if (pageNo === 1) yield { header, totalCount };
+      // Yield the header as soon as we have it — even if data is empty,
+      // so the caller can distinguish "0 rows" from "template broken".
+      if (!headerYielded) {
+        yield { header, totalCount };
+        headerYielded = true;
+      }
       for (const row of data) {
         yield { row };
         yielded++;
