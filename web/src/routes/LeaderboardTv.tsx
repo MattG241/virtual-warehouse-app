@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trophy, Package, PackageCheck, X, Crown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/cn'
@@ -203,6 +203,24 @@ export function LeaderboardTv() {
   const topThree = ranked.slice(0, 3)
   const rest = ranked.slice(3, 11)
 
+  // News ticker — short headlines derived from current data, refreshes
+  // when the data does. (v1; v2 could read a real milestone event log.)
+  const tickerItems = useMemo(() => buildTicker(data), [data])
+
+  // Confetti when #1 changes for this (mode, window) combo. Keyed map
+  // so flipping between Today/WTD/MTD or Pick/Pack doesn't re-fire.
+  const prevWinnerByKey = useRef<Record<string, string | null>>({})
+  const [confettiKey, setConfettiKey] = useState(0)
+  useEffect(() => {
+    const key = `${mode}-${win}`
+    const current = ranked[0]?.picker ?? null
+    const prev = prevWinnerByKey.current[key]
+    if (prev && current && current !== prev) {
+      setConfettiKey((k) => k + 1)
+    }
+    prevWinnerByKey.current[key] = current
+  }, [ranked, mode, win])
+
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })
   const dateStr = now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -370,6 +388,11 @@ export function LeaderboardTv() {
           )}
         </main>
 
+        {/* ── News ticker ──────────────────────────────────────────── */}
+        {tickerItems.length > 0 && (
+          <NewsTicker items={tickerItems} isLight={isLight} borderClass={t.border} />
+        )}
+
         {/* ── Footer ───────────────────────────────────────────────── */}
         <footer className={cn('mt-4 flex flex-col items-start gap-3 border-t pt-4 text-[10px] uppercase tracking-[0.2em] sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5 sm:text-[11px]', t.border, t.textMuted)}>
           <div className="flex items-center gap-3">
@@ -387,6 +410,8 @@ export function LeaderboardTv() {
           </div>
         </footer>
       </div>
+
+      <Confetti trigger={confettiKey} />
 
       <style>{`
         @keyframes fadeUp {
@@ -433,6 +458,23 @@ export function LeaderboardTv() {
         }
         .gold-glow {
           animation: goldGlow 3.2s ease-in-out infinite;
+        }
+        @keyframes tickerSlide {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes confettiFall {
+          0%   { transform: translate3d(0, 0, 0) rotate(0deg);                              opacity: 1; }
+          100% { transform: translate3d(var(--cwobble, 0), 110vh, 0) rotate(var(--cspin, 720deg)); opacity: 0.55; }
+        }
+        .confetti-piece {
+          position: absolute;
+          top: -20px;
+          width: 9px;
+          height: 13px;
+          border-radius: 2px;
+          will-change: transform, opacity;
+          animation: confettiFall var(--cdur, 3s) cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
         }
       `}</style>
     </div>
@@ -568,11 +610,10 @@ function PodiumColumn({
         {/* Top edge highlight */}
         <div className={cn('absolute inset-x-0 top-0 h-[3px]', row ? 'bg-white/60' : 'bg-white/15')} />
 
-        {/* Big rank numeral burnished into the pillar. mix-blend-multiply
-            darkens the gold/silver/bronze underneath so the numeral reads
-            as engraved metal rather than flat dark text fighting the
-            glitter texture. The white text-shadow gives an embossed top
-            edge. */}
+        {/* Big rank numeral on the pillar. Solid dark fill with both a
+            white embossed shadow (light hitting top edge) and a soft
+            black drop shadow (separation from background). Plus a thin
+            stroke so the silhouette is crisp on the busy glitter. */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className={cn(
@@ -580,10 +621,10 @@ function PodiumColumn({
               isWinner ? 'text-[16vh]' : rank === 2 ? 'text-[12vh]' : 'text-[10vh]',
             )}
             style={{
-              color: 'rgba(0,0,0,0.65)',
-              mixBlendMode: 'multiply',
+              color: '#1c1310',
+              WebkitTextStroke: '1.5px rgba(0,0,0,0.55)',
               textShadow:
-                '0 3px 0 rgba(255,255,255,0.45), 0 -1px 0 rgba(255,255,255,0.25)',
+                '0 4px 0 rgba(255,255,255,0.55), 0 -2px 0 rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35)',
             }}
           >
             {rank}
@@ -768,6 +809,46 @@ function RestRow({
   )
 }
 
+const CONFETTI_COLORS = [
+  '#fbbf24', '#22d3ee', '#f43f5e', '#a78bfa', '#10b981',
+  '#fef3c7', '#f97316', '#3b82f6', '#ec4899',
+]
+
+function Confetti({ trigger }: { trigger: number }) {
+  if (trigger === 0) return null
+  // 70 pieces is enough to feel celebratory without tanking GPU.
+  const pieces = Array.from({ length: 70 }, (_, i) => ({
+    left: Math.random() * 100,
+    delay: Math.random() * 0.4,
+    duration: 2.6 + Math.random() * 1.4,
+    wobble: (Math.random() - 0.5) * 280,
+    spin: (Math.random() * 4 + 2) * 360,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  }))
+  return (
+    <div
+      key={trigger}
+      className="pointer-events-none fixed inset-0 z-40 overflow-hidden"
+      aria-hidden
+    >
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: `${p.left}%`,
+            backgroundColor: p.color,
+            animationDelay: `${p.delay}s`,
+            ['--cdur' as string]: `${p.duration}s`,
+            ['--cwobble' as string]: `${p.wobble}px`,
+            ['--cspin' as string]: `${p.spin}deg`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function Dot({ active, accent }: { active: boolean; accent: string }) {
   return (
     <span
@@ -776,6 +857,113 @@ function Dot({ active, accent }: { active: boolean; accent: string }) {
         active ? cn('w-8', accent) : 'w-2 bg-current opacity-20',
       )}
     />
+  )
+}
+
+// ─── News ticker ────────────────────────────────────────────────────────
+
+interface TvData {
+  today: LeaderboardRow[] | null
+  week: LeaderboardRow[] | null
+  month: LeaderboardRow[] | null
+  today_configured: boolean
+  week_configured: boolean
+  month_configured: boolean
+  latest: string | null
+}
+
+function buildTicker(data: TvData): string[] {
+  const sortBy = (rows: LeaderboardRow[] | null, key: keyof LeaderboardRow) => {
+    if (!rows) return []
+    return [...rows]
+      .filter((r) => (r[key] as number) > 0)
+      .sort((a, b) => (b[key] as number) - (a[key] as number))
+  }
+
+  const todayPick = sortBy(data.today, 'items_picked')
+  const todayPack = sortBy(data.today, 'items_despatched')
+  const weekPick = sortBy(data.week, 'items_picked')
+  const weekPack = sortBy(data.week, 'items_despatched')
+  const monthPick = sortBy(data.month, 'items_picked')
+  const monthPack = sortBy(data.month, 'items_despatched')
+
+  const lines: string[] = []
+
+  if (todayPick[0])
+    lines.push(`${todayPick[0].picker} leads today's picking — ${fmtN(todayPick[0].items_picked)} items`)
+  if (todayPick[0] && todayPick[1]) {
+    const gap = (todayPick[0].items_picked as number) - (todayPick[1].items_picked as number)
+    lines.push(`${todayPick[0].picker} ahead by ${fmtN(gap)} · ${todayPick[1].picker} chasing`)
+  }
+  if (todayPack[0])
+    lines.push(`${todayPack[0].picker} top of today's packing — ${fmtN(todayPack[0].items_despatched)} items despatched`)
+  if (weekPick[0])
+    lines.push(`${weekPick[0].picker} leads WTD picking with ${fmtN(weekPick[0].items_picked)} items`)
+  if (weekPack[0])
+    lines.push(`${weekPack[0].picker} leads WTD packing — ${fmtN(weekPack[0].items_despatched)} items out the door`)
+  if (monthPick[0])
+    lines.push(`${monthPick[0].picker} tops month-to-date with ${fmtN(monthPick[0].items_picked)} items picked`)
+  if (monthPack[0])
+    lines.push(`${monthPack[0].picker} leads MTD packing — ${fmtN(monthPack[0].items_despatched)} items shipped`)
+  if (todayPick.length >= 3) {
+    const top3 = todayPick.slice(0, 3).map((r, i) => `#${i + 1} ${r.picker}`).join(' · ')
+    lines.push(`Today's picking podium: ${top3}`)
+  }
+  if (todayPick.length >= 3) {
+    const total = todayPick.reduce((s, r) => s + (r.items_picked as number), 0)
+    lines.push(`Floor total today: ${fmtN(total)} items picked across ${todayPick.length} pickers`)
+  }
+
+  return lines
+}
+
+function NewsTicker({
+  items, isLight, borderClass,
+}: {
+  items: string[]
+  isLight: boolean
+  borderClass: string
+}) {
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    if (items.length <= 1) return
+    const id = setInterval(() => setIdx((i) => (i + 1) % items.length), 5000)
+    return () => clearInterval(id)
+  }, [items.length])
+
+  if (items.length === 0) return null
+  // Reset to 0 if items shrink under current index
+  const safeIdx = idx % items.length
+
+  return (
+    <div className={cn('mt-4 flex items-center gap-3 border-t pt-3 sm:mt-6 sm:gap-4 sm:pt-4', borderClass)}>
+      <span
+        className={cn(
+          'inline-flex h-6 flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-black uppercase tracking-[0.18em] ring-1',
+          isLight
+            ? 'bg-rose-50 text-rose-700 ring-rose-200'
+            : 'bg-rose-500/15 text-rose-300 ring-rose-400/30',
+        )}
+      >
+        <span className="relative inline-flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-70" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+        </span>
+        Live
+      </span>
+      <div className="relative h-6 min-w-0 flex-1 overflow-hidden sm:h-7">
+        <div
+          key={safeIdx}
+          className={cn(
+            'absolute inset-0 flex items-center truncate text-sm font-semibold sm:text-base',
+            isLight ? 'text-slate-700' : 'text-white/80',
+          )}
+          style={{ animation: 'tickerSlide 500ms cubic-bezier(0.16,1,0.3,1) both' }}
+        >
+          {items[safeIdx]}
+        </div>
+      </div>
+    </div>
   )
 }
 
