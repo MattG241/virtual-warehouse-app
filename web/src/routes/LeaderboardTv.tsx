@@ -376,7 +376,7 @@ export function LeaderboardTv() {
             <h2
               key={mode}
               className={cn(
-                'text-[clamp(1.6rem,6.5vw,4.5rem)] font-black uppercase leading-none tracking-tight',
+                'text-[clamp(1.4rem,4.5vw,3.5rem)] font-black uppercase leading-none tracking-tight',
                 isLight ? board.accent.light : board.accent.dark,
                 'animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)]',
               )}
@@ -622,9 +622,9 @@ function Podium({
 
       {/* Desktop / TV — classic 3-pillar podium */}
       <div className="hidden flex-shrink-0 grid-cols-3 items-end gap-6 md:grid xl:gap-10">
-        <PodiumColumn row={top[1]} rank={2} height="h-[16vh]" board={board} isLight={isLight} win={win} delayMs={140} />
-        <PodiumColumn row={top[0]} rank={1} height="h-[22vh]" board={board} isLight={isLight} win={win} delayMs={0} />
-        <PodiumColumn row={top[2]} rank={3} height="h-[13vh]" board={board} isLight={isLight} win={win} delayMs={280} />
+        <PodiumColumn row={top[1]} rank={2} height="h-[12vh]" board={board} isLight={isLight} win={win} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[18vh]" board={board} isLight={isLight} win={win} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[10vh]" board={board} isLight={isLight} win={win} delayMs={280} />
       </div>
     </>
   )
@@ -657,11 +657,11 @@ function PodiumColumn({
             <MedalChip rank={rank} />
             <p
               className={cn(
-                'font-bold uppercase leading-tight',
+                'max-w-full truncate font-bold uppercase leading-tight',
                 isLight ? 'text-slate-900' : 'text-white',
                 isWinner
-                  ? 'text-[clamp(2.6rem,4.4vw,4.5rem)]'
-                  : 'text-[clamp(1.8rem,3vw,3rem)]',
+                  ? 'text-[clamp(1.4rem,2.6vw,3rem)]'
+                  : 'text-[clamp(1.1rem,2vw,2.2rem)]',
               )}
             >
               {row.picker}
@@ -671,7 +671,7 @@ function PodiumColumn({
               <span
                 className={cn(
                   'tabular-nums font-black leading-none tracking-tight metal-text',
-                  isWinner ? 'metal-text-shimmer text-[clamp(3rem,5.5vw,6rem)]' : 'text-[clamp(2rem,3.6vw,3.6rem)]',
+                  isWinner ? 'metal-text-shimmer text-[clamp(2.4rem,4.2vw,4.5rem)]' : 'text-[clamp(1.6rem,2.8vw,2.8rem)]',
                 )}
                 style={{ backgroundImage: metalGradient }}
               >
@@ -696,8 +696,8 @@ function PodiumColumn({
               isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/30')}>
               #{rank}
             </span>
-            <p className={cn('text-[clamp(1.8rem,3vw,3rem)] font-bold', isLight ? 'text-slate-300' : 'text-white/30')}>—</p>
-            <p className={cn('mt-2 text-[clamp(2rem,3vw,3rem)] font-black', isLight ? 'text-slate-200' : 'text-white/20')}>—</p>
+            <p className={cn('text-[clamp(1.1rem,2vw,2.2rem)] font-bold', isLight ? 'text-slate-300' : 'text-white/30')}>—</p>
+            <p className={cn('mt-2 text-[clamp(1.6rem,2.8vw,2.8rem)] font-black', isLight ? 'text-slate-200' : 'text-white/20')}>—</p>
           </>
         )}
       </div>
@@ -736,7 +736,7 @@ function PodiumColumn({
           <span
             className={cn(
               'select-none font-black leading-none tracking-tighter',
-              isWinner ? 'text-[16vh]' : rank === 2 ? 'text-[12vh]' : 'text-[10vh]',
+              isWinner ? 'text-[13vh]' : rank === 2 ? 'text-[9vh]' : 'text-[7vh]',
             )}
             style={{
               color: '#1c1310',
