@@ -1246,7 +1246,7 @@ function OrdersProgressBar({
               </span>
             </>
           )}
-          {' · '}team shipped {orders.despatchedToday} today
+          {' · '}team shipped {fmtN(orders.despatchedToday)} items today
         </p>
       )}
     </section>

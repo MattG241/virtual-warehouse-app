@@ -264,11 +264,14 @@ app.get('/api/orders/progress', async (_req, res) => {
     );
     const baseline = baselineRes.rows[0] || null;
 
-    // Bonus context only — total order-despatch events across pickers
-    // today, from the User activity report. Different units to the
-    // Outstanding-orders count, so we don't use it for the bar.
+    // Bonus context — total units (items) shipped across all pickers
+    // today, summed from the User activity report. Same unit as the
+    // per-picker leaderboard rows ("Anita: 140 items"), so the team
+    // total reads as a clean roll-up of the individual numbers.
+    // Still a different unit from the bar's morning-line-clearance,
+    // but at least it's apples-to-apples with the rest of the screen.
     const despatchRes = await pool.query(
-      `SELECT COALESCE(SUM(orders_despatched), 0)::int AS total
+      `SELECT COALESCE(SUM(items_despatched), 0)::int AS total
          FROM pick_user_totals
         WHERE window_key = 'today'`,
     );
