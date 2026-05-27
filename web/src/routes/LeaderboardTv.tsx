@@ -622,9 +622,9 @@ function Podium({
 
       {/* Desktop / TV — classic 3-pillar podium */}
       <div className="hidden flex-shrink-0 grid-cols-3 items-end gap-6 md:grid xl:gap-10">
-        <PodiumColumn row={top[1]} rank={2} height="h-[12vh]" board={board} isLight={isLight} win={win} delayMs={140} />
-        <PodiumColumn row={top[0]} rank={1} height="h-[18vh]" board={board} isLight={isLight} win={win} delayMs={0} />
-        <PodiumColumn row={top[2]} rank={3} height="h-[10vh]" board={board} isLight={isLight} win={win} delayMs={280} />
+        <PodiumColumn row={top[1]} rank={2} height="h-[9vh]" board={board} isLight={isLight} win={win} delayMs={140} />
+        <PodiumColumn row={top[0]} rank={1} height="h-[14vh]" board={board} isLight={isLight} win={win} delayMs={0} />
+        <PodiumColumn row={top[2]} rank={3} height="h-[7vh]" board={board} isLight={isLight} win={win} delayMs={280} />
       </div>
     </>
   )
@@ -666,29 +666,24 @@ function PodiumColumn({
             >
               {row.picker}
             </p>
-            <div className="mt-2 flex items-baseline gap-2">
-              {/* Big score — metallic gradient text, shimmer on gold */}
+            <div className="mt-1 flex items-baseline gap-2">
+              {/* Big score — metallic gradient text, shimmer on gold.
+                  Metric label and per-row badge chips are intentionally
+                  not rendered here — they're already covered by the
+                  toolbar eyebrow ("by Items picked · Today") and the
+                  always-visible BadgeLegend strip at the bottom, and the
+                  extra rows were squeezing pillars off-screen on laptop
+                  viewports. */}
               <span
                 className={cn(
                   'tabular-nums font-black leading-none tracking-tight metal-text',
-                  isWinner ? 'metal-text-shimmer text-[clamp(2.4rem,4.2vw,4.5rem)]' : 'text-[clamp(1.6rem,2.8vw,2.8rem)]',
+                  isWinner ? 'metal-text-shimmer text-[clamp(2rem,3.5vw,3.8rem)]' : 'text-[clamp(1.4rem,2.4vw,2.4rem)]',
                 )}
                 style={{ backgroundImage: metalGradient }}
               >
                 {fmtN(row[board.metricKey] as number)}
               </span>
             </div>
-            <div
-              className={cn(
-                'mt-1 text-xs uppercase tracking-[0.2em]',
-                isLight ? 'text-slate-500' : 'text-white/40',
-              )}
-            >
-              {board.metricLabel}
-            </div>
-            {badges.length > 0 && (
-              <BadgeRow badges={badges} size={isWinner ? 'xl' : 'lg'} />
-            )}
           </>
         ) : (
           <>
@@ -736,7 +731,7 @@ function PodiumColumn({
           <span
             className={cn(
               'select-none font-black leading-none tracking-tighter',
-              isWinner ? 'text-[13vh]' : rank === 2 ? 'text-[9vh]' : 'text-[7vh]',
+              isWinner ? 'text-[10vh]' : rank === 2 ? 'text-[7vh]' : 'text-[5vh]',
             )}
             style={{
               color: '#1c1310',
