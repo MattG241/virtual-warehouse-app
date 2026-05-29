@@ -74,7 +74,7 @@ That's it — no external email service required. Passwords are hashed with scry
 
 ### Picking & packing leaderboard
 
-The dashboard ranks staff by **items picked** (Picking mode) or **items despatched** (Packing mode) across three time windows: **Today**, **Week to date**, and **Month to date**. There's also a full-screen TV view at `/leaderboard` that auto-cycles between Pick and Pack every 12 seconds — designed for a warehouse big-screen display.
+The dashboard ranks staff by **items picked** (Picking mode) or **items despatched** (Packing mode) across four time windows: **Today**, **Week to date**, **Month to date**, and **Year to date**. There's also a full-screen TV view at `/leaderboard` that auto-cycles between Pick and Pack every 12 seconds — designed for a warehouse big-screen display.
 
 Each window is driven by its own PVX User-activity report template (with the date filter baked in at the template level). The sync runs all configured templates each cycle and writes the current per-user totals into `pick_user_totals`, keyed by window. There's no diffing or snapshot history — each window just shows the latest data PVX returned for that filter.
 
@@ -83,6 +83,7 @@ Each window is driven by its own PVX User-activity report template (with the dat
 | `PVX_PICK_TEMPLATE_TODAY`  | `User activity - Today`                                                                                                                                                                | Template filtered to today. Empty string disables the Today window.                            |
 | `PVX_PICK_TEMPLATE_WTD`    | *(empty)*                                                                                                                                                                              | Template filtered to week-to-date (e.g. Monday → now). Create in PVX → Reporting → Templates.  |
 | `PVX_PICK_TEMPLATE_MTD`    | `User activity`                                                                                                                                                                        | Defaults to PVX's built-in report which filters to "Last month of user activity".              |
+| `PVX_PICK_TEMPLATE_YTD`    | *(empty)*                                                                                                                                                                              | Template filtered to year-to-date (Jan 1 → now). Empty string disables the YTD window. Create in PVX → Reporting → Templates. |
 | `PVX_PICK_TEMPLATE`        | *(deprecated alias)*                                                                                                                                                                   | Legacy single-template knob. If set, used as the Today template.                               |
 | `PVX_PICK_COLUMNS`         | `[UserName],[Picks completed],[Items picked],[Items skipped],[Containers moved],[Item movements performed],[Items moved],[Orders despatched],[Packages despatched],[Items despatched]` | Override if your templates rename columns.                                                     |
 | `PVX_PICK_USER_COL`        | `UserName`                                                                                                                                                                             | The column name holding the picker.                                                            |
@@ -91,7 +92,7 @@ Rows where every metric is 0 (Admin, `Pvx*`, dormant accounts) are dropped at in
 
 Endpoints:
 
-- `GET /api/leaderboard?window=today|week|month&limit=20` — ranked list with all 9 metric columns. `configured` is false if no template is set for that window.
+- `GET /api/leaderboard?window=today|week|month|ytd&limit=20` — ranked list with all 9 metric columns. `configured` is false if no template is set for that window.
 - `POST /api/picks/sync-now` — kick off a one-off sync of every configured window. Accepts `?template=...&windowKey=...` overrides for ad-hoc testing.
 
 ### Morning despatch progress bar (optional)
@@ -154,7 +155,7 @@ If `SLACK_WEBHOOK_URL` is unset, the alerts log to the server console instead so
 - `POST /api/auth/logout` — clears the session cookie.
 - `GET /api/audit?limit=N` — audit log (requires auth).
 - `PUT /api/layout` — saves the warehouse layout (requires auth).
-- `GET /api/leaderboard?window=today|week|month` — picker leaderboard (see Picking leaderboard section).
+- `GET /api/leaderboard?window=today|week|month|ytd` — picker leaderboard (see Picking leaderboard section).
 - `POST /api/picks/sync-now` — kick off a one-off pick activity sync.
 
 ## Known gotchas, baked in

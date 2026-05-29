@@ -63,6 +63,7 @@ const WINDOWS: { key: LeaderboardWindow; label: string; sub: string }[] = [
   { key: 'today', label: 'Today',         sub: 'Live · since midnight' },
   { key: 'week',  label: 'Week to date',  sub: 'Monday → now' },
   { key: 'month', label: 'Month to date', sub: 'This month' },
+  { key: 'ytd',   label: 'Year to date',  sub: 'Jan 1 → now' },
 ]
 
 // Adelaide-local formatters cached at module scope. Rebuilding these
@@ -131,13 +132,16 @@ export function LeaderboardTv() {
     today: LeaderboardRow[] | null
     week: LeaderboardRow[] | null
     month: LeaderboardRow[] | null
+    ytd: LeaderboardRow[] | null
     today_configured: boolean
     week_configured: boolean
     month_configured: boolean
+    ytd_configured: boolean
     latest: string | null
   }>({
-    today: null, week: null, month: null,
+    today: null, week: null, month: null, ytd: null,
     today_configured: false, week_configured: false, month_configured: false,
+    ytd_configured: false,
     latest: null,
   })
   const [err, setErr] = useState<string | null>(null)
@@ -157,9 +161,10 @@ export function LeaderboardTv() {
         fetchLeaderboard('today', c.signal).catch(() => null),
         fetchLeaderboard('week', c.signal).catch(() => null),
         fetchLeaderboard('month', c.signal).catch(() => null),
-      ]).then(([t, w, m]) => {
+        fetchLeaderboard('ytd', c.signal).catch(() => null),
+      ]).then(([t, w, m, y]) => {
         if (cancelled) return
-        const latest = [t, w, m]
+        const latest = [t, w, m, y]
           .map((r) => r?.latest)
           .filter(Boolean)
           .sort()
@@ -168,9 +173,11 @@ export function LeaderboardTv() {
           today: t?.rows ?? null,
           week: w?.rows ?? null,
           month: m?.rows ?? null,
+          ytd: y?.rows ?? null,
           today_configured: t?.configured ?? false,
           week_configured: w?.configured ?? false,
           month_configured: m?.configured ?? false,
+          ytd_configured: y?.configured ?? false,
           latest: latest ?? null,
         })
         setErr(null)
@@ -234,6 +241,7 @@ export function LeaderboardTv() {
       if (e.key === '1') setWin('today')
       if (e.key === '2') setWin('week')
       if (e.key === '3') setWin('month')
+      if (e.key === '4') setWin('ytd')
       if (e.key === 'p' || e.key === 'P') setMode('pick')
       if (e.key === 'k' || e.key === 'K') setMode('pack')
     }
@@ -427,14 +435,14 @@ export function LeaderboardTv() {
                 {windowMeta.label} template isn't configured
               </p>
               <p className={cn('mt-2 max-w-xl text-sm uppercase tracking-wider', t.textSubtle)}>
-                Set PVX_PICK_TEMPLATE_{win === 'today' ? 'TODAY' : win === 'week' ? 'WTD' : 'MTD'} on the server.
+                Set PVX_PICK_TEMPLATE_{win === 'today' ? 'TODAY' : win === 'week' ? 'WTD' : win === 'ytd' ? 'YTD' : 'MTD'} on the server.
               </p>
             </Centered>
           ) : ranked.length === 0 ? (
             <Centered>
               <board.Icon className={cn('mb-4 h-14 w-14', t.textSubtle)} />
               <p className={cn('text-2xl font-semibold', t.textMuted)}>
-                No {board.label.toLowerCase()} activity {win === 'today' ? 'yet today' : win === 'week' ? 'this week' : 'this month'}
+                No {board.label.toLowerCase()} activity {win === 'today' ? 'yet today' : win === 'week' ? 'this week' : win === 'ytd' ? 'this year' : 'this month'}
               </p>
               <p className={cn('mt-2 text-sm uppercase tracking-wider', t.textSubtle)}>
                 Refreshing every {REFRESH_MS / 1000}s
@@ -1259,9 +1267,11 @@ interface TvData {
   today: LeaderboardRow[] | null
   week: LeaderboardRow[] | null
   month: LeaderboardRow[] | null
+  ytd: LeaderboardRow[] | null
   today_configured: boolean
   week_configured: boolean
   month_configured: boolean
+  ytd_configured: boolean
   latest: string | null
 }
 
@@ -1279,6 +1289,8 @@ function buildTicker(data: TvData): string[] {
   const weekPack = sortBy(data.week, 'items_despatched')
   const monthPick = sortBy(data.month, 'items_picked')
   const monthPack = sortBy(data.month, 'items_despatched')
+  const ytdPick = sortBy(data.ytd, 'items_picked')
+  const ytdPack = sortBy(data.ytd, 'items_despatched')
 
   const lines: string[] = []
 
@@ -1298,6 +1310,10 @@ function buildTicker(data: TvData): string[] {
     lines.push(`${monthPick[0].picker} tops month-to-date with ${fmtN(monthPick[0].items_picked)} items picked`)
   if (monthPack[0])
     lines.push(`${monthPack[0].picker} leads MTD packing — ${fmtN(monthPack[0].items_despatched)} items shipped`)
+  if (ytdPick[0])
+    lines.push(`${ytdPick[0].picker} tops year-to-date with ${fmtN(ytdPick[0].items_picked)} items picked`)
+  if (ytdPack[0])
+    lines.push(`${ytdPack[0].picker} leads YTD packing — ${fmtN(ytdPack[0].items_despatched)} items shipped`)
   if (todayPick.length >= 3) {
     const top3 = todayPick.slice(0, 3).map((r, i) => `#${i + 1} ${r.picker}`).join(' · ')
     lines.push(`Today's picking podium: ${top3}`)

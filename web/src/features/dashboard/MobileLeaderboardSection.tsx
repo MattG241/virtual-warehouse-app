@@ -17,6 +17,7 @@ const WINDOWS: { key: LeaderboardWindow; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'WTD' },
   { key: 'month', label: 'MTD' },
+  { key: 'ytd', label: 'YTD' },
 ]
 
 interface MetricCfg {
@@ -80,7 +81,7 @@ export function MobileLeaderboardSection() {
   const max = (ranked[0]?.[metric.primary] as number) || 1
 
   const winLabel =
-    win === 'today' ? 'today' : win === 'week' ? 'this week' : 'this month'
+    win === 'today' ? 'today' : win === 'week' ? 'this week' : win === 'ytd' ? 'this year' : 'this month'
   const modeLabel = mode === 'pick' ? 'picking' : 'packing'
 
   return (
@@ -159,11 +160,11 @@ export function MobileLeaderboardSection() {
         </ul>
       ) : !data.configured ? (
         <p className="rounded-xl bg-surface/60 px-4 py-5 text-center text-[12px] text-muted">
-          {win === 'today' ? 'Today' : win === 'week' ? 'WTD' : 'MTD'} template isn't
+          {win === 'today' ? 'Today' : win === 'week' ? 'WTD' : win === 'ytd' ? 'YTD' : 'MTD'} template isn't
           configured.
           <br />
           Set <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[10px]">
-            PVX_PICK_TEMPLATE_{win === 'today' ? 'TODAY' : win === 'week' ? 'WTD' : 'MTD'}
+            PVX_PICK_TEMPLATE_{win === 'today' ? 'TODAY' : win === 'week' ? 'WTD' : win === 'ytd' ? 'YTD' : 'MTD'}
           </code>{' '}
           to enable.
         </p>

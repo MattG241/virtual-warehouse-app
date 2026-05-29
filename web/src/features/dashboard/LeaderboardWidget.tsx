@@ -18,6 +18,7 @@ const WINDOWS: { key: LeaderboardWindow; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'WTD' },
   { key: 'month', label: 'MTD' },
+  { key: 'ytd', label: 'YTD' },
 ]
 
 const MODES: { key: Mode; label: string; icon: typeof Package }[] = [
@@ -190,11 +191,11 @@ export function LeaderboardWidget() {
           <SkeletonRows />
         ) : !data.configured ? (
           <EmptyState
-            title={`${win === 'week' ? 'Week-to-date' : win === 'month' ? 'Month-to-date' : 'Today'} template isn't configured`}
+            title={`${win === 'week' ? 'Week-to-date' : win === 'month' ? 'Month-to-date' : win === 'ytd' ? 'Year-to-date' : 'Today'} template isn't configured`}
             body={
               <>
                 Set <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px]">
-                  PVX_PICK_TEMPLATE_{win === 'week' ? 'WTD' : win === 'month' ? 'MTD' : 'TODAY'}
+                  PVX_PICK_TEMPLATE_{win === 'week' ? 'WTD' : win === 'month' ? 'MTD' : win === 'ytd' ? 'YTD' : 'TODAY'}
                 </code>{' '}
                 on the server to a PVX User-activity template filtered to this window.
               </>
@@ -202,7 +203,7 @@ export function LeaderboardWidget() {
           />
         ) : ranked.length === 0 ? (
           <EmptyState
-            title={`No ${mode === 'pick' ? 'picking' : 'packing'} activity ${win === 'today' ? 'yet today' : win === 'week' ? 'this week' : 'this month'}`}
+            title={`No ${mode === 'pick' ? 'picking' : 'packing'} activity ${win === 'today' ? 'yet today' : win === 'week' ? 'this week' : win === 'ytd' ? 'this year' : 'this month'}`}
             body={
               data.latest
                 ? `Last refreshed ${timeAgo(data.latest)}.`

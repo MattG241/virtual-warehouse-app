@@ -327,7 +327,7 @@ app.post('/api/picks/sync-now', express.json(), async (req, res) => {
 });
 
 app.get('/api/leaderboard', async (req, res) => {
-  const allowed = new Set(['today', 'week', 'month']);
+  const allowed = new Set(['today', 'week', 'month', 'ytd']);
   const windowKey = allowed.has(String(req.query.window)) ? req.query.window : 'today';
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
 

@@ -214,7 +214,7 @@ const TOTAL_COLS = [
   ['Items despatched',         'items_despatched'],
 ];
 
-const ALL_WINDOWS = ['today', 'week', 'month'];
+const ALL_WINDOWS = ['today', 'week', 'month', 'ytd'];
 
 let pickRunning = false;
 export async function runPickSync(opts = {}) {

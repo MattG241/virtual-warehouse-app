@@ -120,7 +120,7 @@ export async function fetchSyncStatus(): Promise<{ runs: SyncRun[] }> {
   return res.json()
 }
 
-export type LeaderboardWindow = 'today' | 'week' | 'month'
+export type LeaderboardWindow = 'today' | 'week' | 'month' | 'ytd'
 
 export interface LeaderboardRow {
   picker: string

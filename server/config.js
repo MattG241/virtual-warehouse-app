@@ -31,6 +31,7 @@ function loadConfig() {
           || 'User activity - Today',
         week:  process.env.PVX_PICK_TEMPLATE_WTD   || '',
         month: process.env.PVX_PICK_TEMPLATE_MTD   || 'User activity',
+        ytd:   process.env.PVX_PICK_TEMPLATE_YTD   || '',
       },
       pickColumns:
         process.env.PVX_PICK_COLUMNS ||
